@@ -1,0 +1,3188 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Шахматы — Viora Studio</title>
+<style>
+  :root {
+    --gold: #D4AF37;
+    --gold-light: #F0D060;
+    --gold-dark: #A0820A;
+    --black: #0A0A0A;
+    --dark: #111111;
+    --dark2: #1A1A1A;
+    --silver: #C0C0C0;
+    --glass: rgba(15,15,15,0.85);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070707; font-family: 'Segoe UI', Arial, sans-serif; }
+  #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+  canvas { display: block; }
+
+  /* TOP BAR */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+    background: rgba(8,8,8,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(212,175,55,0.3);
+    box-shadow: 0 2px 30px rgba(0,0,0,0.8);
+  }
+  #topbar .logo { color: var(--gold); font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  #topbar .status {
+    color: var(--gold); font-size: 0.95rem; font-weight: 600;
+    text-align: center; flex: 1; padding: 0 10px;
+    text-shadow: 0 0 15px rgba(212,175,55,0.5);
+  }
+  .difficulty-btns { display: flex; gap: 6px; }
+  .diff-btn {
+    background: transparent; border: 1px solid var(--gold-dark);
+    color: var(--gold); padding: 5px 12px; border-radius: 4px;
+    cursor: pointer; font-size: 0.75rem; font-weight: 600;
+    transition: all 0.2s; letter-spacing: 1px;
+  }
+  .diff-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
+  .diff-btn:hover:not(.active) { background: rgba(212,175,55,0.15); }
+
+  #hud-panel {
+    position: fixed; top: 76px; left: 20px; right: 20px; z-index: 10;
+    display: flex; align-items: stretch; justify-content: space-between;
+    gap: 12px; pointer-events: none;
+  }
+  .hud-card {
+    pointer-events: auto;
+    min-width: 0;
+    background: rgba(8,8,8,0.84);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 14px;
+    padding: 12px 14px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  }
+  #score-card { display: flex; align-items: center; gap: 16px; }
+  .score-block { display: flex; flex-direction: column; gap: 2px; }
+  .score-label {
+    color: #8F8F8F; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 1.4px;
+  }
+  .score-value {
+    color: #F5F0D2; font-size: 1.2rem; font-weight: 700;
+  }
+  .score-divider {
+    color: rgba(212,175,55,0.55); font-size: 1.1rem; font-weight: 700;
+  }
+
+  #tournament-card {
+    display: flex; align-items: center; gap: 18px;
+    margin-left: auto;
+  }
+  .tournament-copy {
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0;
+  }
+  .tournament-title {
+    color: var(--gold); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.8px;
+  }
+  .tournament-sub {
+    color: #8E8E8E; font-size: 0.74rem; line-height: 1.35;
+  }
+  #tournament-copy-compact {
+    display: none;
+    color: #9B9B9B;
+    font-size: 0.72rem;
+    letter-spacing: 0.5px;
+  }
+  .switch {
+    position: relative; width: 58px; height: 32px; flex: 0 0 auto;
+    display: inline-flex; align-items: center;
+  }
+  .switch input { display: none; }
+  .slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 999px; transition: all 0.25s ease;
+  }
+  .slider::before {
+    content: ''; position: absolute; top: 3px; left: 4px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #FFF4BE, #D4AF37);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    transition: transform 0.25s ease;
+  }
+  .switch input:checked + .slider {
+    background: rgba(212,175,55,0.22);
+    border-color: rgba(212,175,55,0.65);
+    box-shadow: 0 0 24px rgba(212,175,55,0.18);
+  }
+  .switch input:checked + .slider::before { transform: translateX(25px); }
+
+  #clock-card {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .clock-box {
+    min-width: 92px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(212,175,55,0.18);
+    background: rgba(255,255,255,0.03);
+    transition: all 0.25s ease;
+  }
+  .clock-box.active {
+    border-color: rgba(212,175,55,0.75);
+    box-shadow: inset 0 0 20px rgba(212,175,55,0.08), 0 0 20px rgba(212,175,55,0.12);
+    transform: translateY(-1px);
+  }
+  .clock-box.tournament-off { opacity: 0.45; }
+  .clock-side {
+    color: #8A8A8A; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 1.2px; margin-bottom: 4px;
+  }
+  .clock-time {
+    color: #F5F0D2; font-size: 1.15rem; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hidden-chat #chat-panel,
+  .hidden-chat #chat-toggle-btn {
+    display: none !important;
+  }
+
+  #chat-restore-btn {
+    position: fixed; right: 18px; bottom: 18px; z-index: 12;
+    display: none;
+    background: rgba(8,8,8,0.92);
+    color: var(--gold);
+    border: 1px solid var(--gold-dark);
+    border-radius: 999px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .hidden-chat #chat-restore-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #tutorial-panel {
+    position: fixed; right: 24px; bottom: 24px; z-index: 14;
+    width: min(340px, calc(100vw - 32px));
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(212,175,55,0.24);
+    background: linear-gradient(180deg, rgba(18,18,18,0.78), rgba(8,8,8,0.58));
+    backdrop-filter: blur(20px);
+    box-shadow: 0 14px 38px rgba(0,0,0,0.35);
+    display: none;
+  }
+  #tutorial-panel.visible { display: block; }
+  .tutorial-kicker {
+    color: var(--gold);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  #tutorial-text {
+    color: #E6E0BF;
+    font-size: 0.86rem;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .tutorial-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .tutorial-btn {
+    flex: 1;
+    border-radius: 10px;
+    border: 1px solid rgba(212,175,55,0.25);
+    background: rgba(255,255,255,0.04);
+    color: var(--gold);
+    cursor: pointer;
+    padding: 9px 10px;
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+  .tutorial-btn.primary { background: rgba(212,175,55,0.16); }
+
+  #tutorial-complete-overlay {
+    position: fixed; inset: 0; z-index: 170;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+  }
+  #tutorial-complete-box {
+    width: min(460px, calc(100vw - 32px));
+    padding: 34px 30px;
+    border-radius: 18px;
+    border: 1px solid rgba(212,175,55,0.42);
+    background: rgba(14,14,14,0.95);
+    text-align: center;
+    box-shadow: 0 0 54px rgba(212,175,55,0.25);
+  }
+  #tutorial-complete-box h2 {
+    color: var(--gold);
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+  #tutorial-complete-box p {
+    color: #B7B7B7;
+    line-height: 1.7;
+    margin-bottom: 24px;
+  }
+
+  /* ACTION BUTTONS */
+  #action-btns {
+    position: fixed; bottom: 60px; left: 20px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .action-btn {
+    background: rgba(8,8,8,0.9); border: 1px solid var(--gold-dark);
+    color: var(--gold); padding: 8px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem; font-weight: 600;
+    transition: all 0.2s; backdrop-filter: blur(10px);
+    letter-spacing: 1px; white-space: nowrap;
+  }
+  .action-btn:hover { background: rgba(212,175,55,0.15); border-color: var(--gold); }
+  .action-btn.danger { border-color: #8B0000; color: #FF6B6B; }
+  .action-btn.danger:hover { background: rgba(139,0,0,0.2); }
+  .action-btn.hidden { display: none !important; }
+  .action-btn.tutorial-confirm {
+    border-color: rgba(123,224,255,0.85);
+    color: #B8EEFF;
+    background: rgba(27,65,86,0.45);
+    animation: tutorialConfirmPulse 1.4s ease-in-out infinite;
+  }
+  .action-btn.tutorial-confirm:hover {
+    border-color: #7BE0FF;
+    background: rgba(46,101,128,0.56);
+  }
+  @keyframes tutorialConfirmPulse {
+    0%,100% { box-shadow: 0 0 0 rgba(123,224,255,0.0); }
+    50% { box-shadow: 0 0 14px rgba(123,224,255,0.44); }
+  }
+
+  /* CHAT PANEL */
+  #chat-panel {
+    position: fixed; top: 60px; right: 0; bottom: 0; width: 300px; z-index: 10;
+    background: linear-gradient(180deg, rgba(20,20,20,0.34), rgba(8,8,8,0.24));
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), -24px 0 40px rgba(0,0,0,0.22);
+    display: flex; flex-direction: column;
+    transition: transform 0.3s ease;
+  }
+  #chat-panel.collapsed { transform: translateX(100%); }
+  #chat-header {
+    padding: 12px 16px; border-bottom: 1px solid rgba(212,175,55,0.2);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #chat-header-controls {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-header-btn {
+    background: rgba(255,255,255,0.04);
+    color: var(--gold);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+  }
+  .chat-header-btn:hover { background: rgba(212,175,55,0.15); border-color: rgba(212,175,55,0.45); }
+  #chat-header span { color: var(--gold); font-size: 0.85rem; font-weight: 700; letter-spacing: 1px; }
+  #chat-toggle-btn {
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+    z-index: 11; background: rgba(8,8,8,0.9);
+    border: 1px solid var(--gold-dark); border-right: none;
+    color: var(--gold); padding: 12px 8px; cursor: pointer;
+    border-radius: 6px 0 0 6px; font-size: 0.7rem;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    letter-spacing: 2px; font-weight: 700;
+    transition: all 0.3s;
+  }
+  #chat-messages {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    scrollbar-width: thin; scrollbar-color: var(--gold-dark) transparent;
+  }
+  #chat-messages::-webkit-scrollbar { width: 4px; }
+  #chat-messages::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 2px; }
+  .chat-msg {
+    padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;
+    line-height: 1.5; animation: fadeInMsg 0.3s ease;
+  }
+  @keyframes fadeInMsg { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  .chat-msg.ai {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    color: #DDD; border-left: 3px solid var(--gold);
+  }
+  .chat-msg.system {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    color: #888; text-align: center; font-size: 0.72rem;
+  }
+  .chat-msg .msg-label { color: var(--gold); font-weight: 700; font-size: 0.7rem; margin-bottom: 3px; }
+  .chat-msg.user {
+    background: rgba(212,175,55,0.08);
+    border: 1px solid rgba(212,175,55,0.18);
+    color: #F0E8C3;
+  }
+  #chat-input-area {
+    padding: 10px; border-top: 1px solid rgba(212,175,55,0.2);
+    display: flex; gap: 6px;
+  }
+  #chat-input {
+    flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    color: #EEE; padding: 7px 10px; border-radius: 5px; font-size: 0.78rem;
+    outline: none; resize: none;
+  }
+  #chat-input::placeholder { color: #555; }
+  #chat-send {
+    background: var(--gold); color: #000; border: none; padding: 7px 12px;
+    border-radius: 5px; cursor: pointer; font-size: 0.75rem; font-weight: 700;
+    transition: all 0.2s;
+  }
+  #chat-send:hover { background: var(--gold-light); }
+
+  /* POPUP */
+  #popup-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.92); backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #popup-box {
+    background: rgba(12,12,12,0.98); border: 1px solid var(--gold);
+    border-radius: 16px; padding: 40px 50px; text-align: center;
+    max-width: 440px; width: 90%;
+    box-shadow: 0 0 60px rgba(212,175,55,0.3), inset 0 0 30px rgba(212,175,55,0.05);
+  }
+  #popup-box h2 { color: var(--gold); font-size: 1.6rem; margin-bottom: 10px; letter-spacing: 2px; }
+  #popup-box p { color: #AAA; font-size: 0.9rem; margin-bottom: 30px; line-height: 1.6; }
+  .popup-btns { display: flex; gap: 16px; justify-content: center; }
+  .popup-btn {
+    padding: 12px 32px; border-radius: 8px; cursor: pointer;
+    font-size: 0.95rem; font-weight: 700; letter-spacing: 1px;
+    transition: all 0.2s; border: none;
+  }
+  .popup-btn.yes { background: var(--gold); color: #000; }
+  .popup-btn.yes:hover { background: var(--gold-light); box-shadow: 0 0 20px rgba(212,175,55,0.5); }
+  .popup-btn.no { background: transparent; color: var(--gold); border: 1px solid var(--gold-dark); }
+  .popup-btn.no:hover { background: rgba(212,175,55,0.1); }
+
+  /* PROMOTION POPUP */
+  #promo-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #promo-box {
+    background: rgba(12,12,12,0.98); border: 1px solid var(--gold);
+    border-radius: 14px; padding: 30px 40px; text-align: center;
+    box-shadow: 0 0 40px rgba(212,175,55,0.3);
+  }
+  #promo-box h3 { color: var(--gold); margin-bottom: 20px; letter-spacing: 2px; font-size: 1.1rem; }
+  .promo-pieces { display: flex; gap: 16px; justify-content: center; }
+  .promo-piece {
+    width: 60px; height: 60px; border: 1px solid var(--gold-dark);
+    border-radius: 8px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 2rem; transition: all 0.2s;
+    background: rgba(212,175,55,0.05);
+  }
+  .promo-piece:hover { background: rgba(212,175,55,0.2); border-color: var(--gold); }
+
+  /* GAME OVER */
+  #gameover-overlay {
+    position: fixed; inset: 0; z-index: 150;
+    background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+  }
+  #gameover-box {
+    background: rgba(12,12,12,0.98); border: 1px solid var(--gold);
+    border-radius: 16px; padding: 40px 50px; text-align: center;
+    box-shadow: 0 0 60px rgba(212,175,55,0.4);
+    max-width: 400px; width: 90%;
+  }
+  #gameover-box h2 { color: var(--gold); font-size: 1.8rem; margin-bottom: 12px; letter-spacing: 3px; }
+  #gameover-box p { color: #AAA; margin-bottom: 28px; font-size: 0.9rem; }
+  .go-btn {
+    background: var(--gold); color: #000; border: none; padding: 12px 36px;
+    border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 700;
+    letter-spacing: 1px; transition: all 0.2s;
+  }
+  .go-btn:hover { background: var(--gold-light); box-shadow: 0 0 25px rgba(212,175,55,0.6); }
+
+  /* VIORA BTN */
+  #viora-btn {
+    position: fixed; left: 20px; bottom: 20px; z-index: 20;
+    background: transparent; border: 1px solid rgba(212,175,55,0.4);
+    color: var(--gold); padding: 6px 14px; border-radius: 5px;
+    cursor: pointer; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    transition: all 0.2s; backdrop-filter: blur(10px);
+    background: rgba(8,8,8,0.7);
+  }
+  #viora-btn:hover { border-color: var(--gold); box-shadow: 0 0 15px rgba(212,175,55,0.3); }
+
+  /* LOADING */
+  #loading {
+    position: fixed; inset: 0; z-index: 300;
+    background: #070707; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+    transition: opacity 0.5s;
+  }
+  #loading .load-logo { color: var(--gold); font-size: 2rem; font-weight: 700; letter-spacing: 4px; }
+  #loading .load-sub { color: #666; font-size: 0.8rem; letter-spacing: 2px; }
+  .load-bar-wrap { width: 200px; height: 2px; background: rgba(212,175,55,0.15); border-radius: 1px; }
+  .load-bar { height: 100%; background: var(--gold); border-radius: 1px; animation: loadAnim 1.5s ease-in-out infinite; }
+  @keyframes loadAnim { 0%{width:0%} 50%{width:100%} 100%{width:0%;margin-left:100%} }
+
+  /* MOBILE */
+  @media (max-width: 768px) {
+    html, body { overscroll-behavior: none; }
+    #chat-panel { width: 100%; top: auto; bottom: 0; height: min(52vh, 420px); transform: translateY(100%); border-left: none; border-top: 1px solid rgba(212,175,55,0.3); }
+    #chat-panel.mobile-open { transform: translateY(0); }
+    #chat-toggle-btn { top: auto; bottom: 150px; right: 12px; transform: none; writing-mode: horizontal-tb; border: 1px solid var(--gold-dark); border-radius: 999px; padding: 10px 14px; font-size: 0.72rem; }
+    #topbar {
+      padding: 10px 12px 12px;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    #topbar .logo { font-size: 0.86rem; letter-spacing: 1.5px; }
+    #topbar .status {
+      order: 3; width: 100%;
+      font-size: 0.82rem; padding: 0;
+      text-align: left;
+    }
+    .difficulty-btns {
+      width: 100%;
+      justify-content: space-between;
+      order: 4;
+    }
+    .diff-btn {
+      flex: 1;
+      padding: 8px 6px;
+      font-size: 0.68rem;
+    }
+    #hud-panel {
+      top: 126px; left: 12px; right: 12px;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .hud-card { padding: 12px; border-radius: 12px; }
+    #score-card, #tournament-card {
+      width: 100%;
+      justify-content: space-between;
+    }
+    #tournament-card {
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-left: 0;
+    }
+    .tournament-sub { display: none; }
+    #tournament-copy-compact { display: block; width: 100%; }
+    .tournament-copy { flex: 1 1 140px; }
+    #clock-card {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .clock-box { flex: 1; min-width: 0; }
+    #action-btns {
+      left: 12px; right: 12px; bottom: 14px;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .action-btn {
+      flex: 1 1 calc(50% - 6px);
+      padding: 10px 8px;
+      font-size: 0.71rem;
+      letter-spacing: 0.4px;
+    }
+    #captured-area {
+      left: 12px; right: 12px; bottom: 118px;
+      flex-direction: row; justify-content: space-between;
+      gap: 8px;
+    }
+    .captured-row {
+      max-width: calc(50vw - 20px);
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(8,8,8,0.72);
+      border: 1px solid rgba(212,175,55,0.16);
+      min-height: 38px;
+    }
+    #viora-btn { left: 12px; bottom: 170px; }
+    #chat-input-area { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    #chat-restore-btn { bottom: 132px; right: 12px; }
+    #tutorial-panel {
+      left: 12px; right: 12px; bottom: 190px;
+      width: auto;
+    }
+  }
+
+  @media (max-width: 560px) {
+    #topbar {
+      padding: 8px 10px 10px;
+      gap: 8px;
+    }
+    #topbar .logo { font-size: 0.78rem; letter-spacing: 1.2px; }
+    #topbar .status { font-size: 0.78rem; }
+    .difficulty-btns { gap: 4px; }
+    .diff-btn {
+      padding: 8px 4px;
+      font-size: 0.64rem;
+    }
+    #hud-panel { top: 118px; }
+    .hud-card {
+      padding: 10px 11px;
+      border-radius: 12px;
+    }
+    #score-card { gap: 12px; }
+    .score-value { font-size: 1.05rem; }
+    .clock-box { padding: 8px 10px; }
+    .clock-time { font-size: 1rem; }
+    #action-btns { gap: 6px; }
+    .action-btn {
+      min-height: 42px;
+      font-size: 0.68rem;
+    }
+    #captured-area {
+      bottom: 110px;
+      gap: 6px;
+    }
+    .captured-row {
+      min-height: 34px;
+      font-size: 0.9rem;
+    }
+    #viora-btn { bottom: 154px; }
+    #chat-toggle-btn { bottom: 118px; }
+    #chat-restore-btn { bottom: 112px; }
+    #tutorial-panel { bottom: 170px; }
+  }
+
+  .thinking-dots span {
+    display: inline-block; animation: dot-blink 1.2s infinite;
+    color: var(--gold);
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+  #captured-area {
+    position: fixed; bottom: 60px; right: 310px; z-index: 10;
+    display: flex; flex-direction: column; gap: 4px;
+    pointer-events: none;
+  }
+  .captured-row { display: flex; gap: 2px; flex-wrap: wrap; max-width: 180px; }
+  .cap-piece { font-size: 1rem; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-logo">♔ ШАХМАТЫ</div>
+  <div class="load-sub">VIORA STUDIO</div>
+  <div class="load-bar-wrap"><div class="load-bar"></div></div>
+</div>
+
+<div id="canvas-container"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">♔ Шахматы</div>
+  <div class="status" id="status-text">Ваш ход</div>
+  <div class="difficulty-btns">
+    <button class="diff-btn active" onclick="setDifficulty('easy')" id="btn-easy">Легко</button>
+    <button class="diff-btn" onclick="setDifficulty('medium')" id="btn-medium">Стандарт</button>
+    <button class="diff-btn" onclick="setDifficulty('hard')" id="btn-hard">Сложно</button>
+  </div>
+</div>
+
+<div id="hud-panel">
+  <div class="hud-card" id="score-card">
+    <div class="score-block">
+      <span class="score-label">Игрок</span>
+      <span class="score-value" id="player-score">0</span>
+    </div>
+    <div class="score-divider">:</div>
+    <div class="score-block">
+      <span class="score-label">ИИ</span>
+      <span class="score-value" id="ai-score">0</span>
+    </div>
+  </div>
+  <div class="hud-card" id="tournament-card">
+    <div class="tournament-copy">
+      <span class="tournament-title">Турнирный режим</span>
+      <span class="tournament-sub">Без подсветки ходов, с шахматными часами и автоходом при просрочке.</span>
+    </div>
+    <span id="tournament-copy-compact">Часы и автоход по времени</span>
+    <label class="switch" aria-label="Турнирный режим">
+      <input type="checkbox" id="tournament-toggle" onchange="toggleTournamentMode(this.checked)">
+      <span class="slider"></span>
+    </label>
+    <div id="clock-card">
+      <div class="clock-box" id="clock-white-box">
+        <div class="clock-side">Игрок</div>
+        <div class="clock-time" id="clock-white">05:00</div>
+      </div>
+      <div class="clock-box" id="clock-black-box">
+        <div class="clock-side">ИИ</div>
+        <div class="clock-time" id="clock-black">05:00</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT PANEL -->
+<div id="chat-panel">
+  <div id="chat-header">
+    <span>ИИ-соперник</span>
+    <div id="chat-header-controls">
+      <span style="color:#555;font-size:0.7rem" id="ai-model-label">mistral-tiny</span>
+      <button class="chat-header-btn" type="button" onclick="hideChatCompletely()">Скрыть</button>
+    </div>
+  </div>
+  <div id="chat-messages"></div>
+</div>
+<button id="chat-toggle-btn" onclick="toggleChat()">ЧАТ</button>
+
+<button id="chat-restore-btn" type="button" onclick="showHiddenChat()">Показать чат</button>
+<!-- ACTION BUTTONS -->
+<div id="action-btns">
+  <button class="action-btn" onclick="undoMove()">Отменить ход</button>
+  <button class="action-btn" onclick="newGame()">Новая игра</button>
+  <button class="action-btn danger" onclick="resignGame()">Сдаться</button>
+  <button class="action-btn" onclick="openTrainingTheory()">Обучение</button>
+  <button id="tutorial-confirm-btn" class="action-btn tutorial-confirm hidden" type="button" onclick="confirmTutorialStep()">Понятно</button>
+</div>
+
+<!-- CAPTURED -->
+<div id="captured-area">
+  <div class="captured-row" id="captured-white" style="color:#F0D060"></div>
+  <div class="captured-row" id="captured-black" style="color:#CCC"></div>
+</div>
+
+<!-- WELCOME POPUP -->
+<div id="popup-overlay" style="display:none">
+  <div id="popup-box">
+    <h2>♔ Добро пожаловать!</h2>
+    <p>Вы уже умеете играть в шахматы?<br><span style="color:#555;font-size:0.8rem">Если нет — спокойно покажем правила и поможем начать</span></p>
+    <div class="popup-btns">
+      <button class="popup-btn yes" onclick="startGame()">Да, играть!</button>
+      <button class="popup-btn no" onclick="goToRules()">Нет, сначала обучение</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROMOTION POPUP -->
+<div id="promo-overlay">
+  <div id="promo-box">
+    <h3>ПРЕВРАЩЕНИЕ ПЕШКИ</h3>
+    <div class="promo-pieces">
+      <div class="promo-piece" onclick="selectPromotion('q')">♛</div>
+      <div class="promo-piece" onclick="selectPromotion('r')">♜</div>
+      <div class="promo-piece" onclick="selectPromotion('b')">♝</div>
+      <div class="promo-piece" onclick="selectPromotion('n')">♞</div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover-overlay">
+  <div id="gameover-box">
+    <h2 id="go-title">МАТ!</h2>
+    <p id="go-desc">Игра завершена</p>
+    <button class="go-btn" onclick="newGame()">Новая игра</button>
+  </div>
+</div>
+
+<div id="tutorial-panel">
+  <div class="tutorial-kicker">Обучающий матч</div>
+  <div id="tutorial-text">Здесь будут появляться подсказки по ходу партии.</div>
+  <div class="tutorial-actions">
+    <button class="tutorial-btn primary" type="button" onclick="requestTutorialHint(true)">Подсказка</button>
+    <button class="tutorial-btn" type="button" onclick="dismissTutorialMessage()">Скрыть</button>
+  </div>
+</div>
+
+<div id="tutorial-complete-overlay">
+  <div id="tutorial-complete-box">
+    <h2>Поздравляем!</h2>
+    <p>Вы завершили обучающий матч. Теперь можно перейти к обычной игре или ещё раз пройти теорию и закрепить материал.</p>
+    <button class="go-btn" type="button" onclick="closeTutorialComplete()">Продолжить</button>
+  </div>
+</div>
+
+<!-- VIORA STUDIO -->
+<button id="viora-btn" onclick="window.open('https://t.me/VioraStudio','_blank')">viora studio</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// CHESS ENGINE
+// ============================================================
+const PIECES = { PAWN:'p', ROOK:'r', KNIGHT:'n', BISHOP:'b', QUEEN:'q', KING:'k' };
+const WHITE = 'w', BLACK = 'b';
+const TOURNAMENT_INITIAL_MS = 5 * 60 * 1000;
+const TOURNAMENT_INCREMENT_MS = 3000;
+const PROMOTION_TYPES = ['q', 'r', 'b', 'n'];
+const TUTORIAL_STORAGE_KEY = 'chess_start_tutorial';
+const helperRequests = new Map();
+let helperRequestSeq = 0;
+let helperWorker = null;
+
+class ChessEngine {
+  constructor() { this.reset(); }
+  reset() {
+    this.board = this.initBoard();
+    this.turn = WHITE;
+    this.castlingRights = { w: {k:true,q:true}, b: {k:true,q:true} };
+    this.enPassantTarget = null;
+    this.moveHistory = [];
+    this.halfMoveClock = 0;
+    this.capturedByWhite = [];
+    this.capturedByBlack = [];
+  }
+  initBoard() {
+    const b = Array(8).fill(null).map(()=>Array(8).fill(null));
+    const backRow = ['r','n','b','q','k','b','n','r'];
+    for(let c=0;c<8;c++) {
+      b[0][c] = {type:backRow[c], color:BLACK};
+      b[1][c] = {type:'p', color:BLACK};
+      b[6][c] = {type:'p', color:WHITE};
+      b[7][c] = {type:backRow[c], color:WHITE};
+    }
+    return b;
+  }
+  getPiece(r,c) { return (r>=0&&r<8&&c>=0&&c<8) ? this.board[r][c] : null; }
+  setPiece(r,c,p) { this.board[r][c]=p; }
+
+  getLegalMoves(r,c) {
+    const piece = this.getPiece(r,c);
+    if(!piece||piece.color!==this.turn) return [];
+    const pseudo = this.getPseudoMoves(r,c,piece);
+    return pseudo.filter(m => !this.wouldBeInCheck(r,c,m.r,m.c,m));
+  }
+
+  getAllLegalMoves(color) {
+    const moves = [];
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+      const p = this.getPiece(r,c);
+      if(p&&p.color===color) {
+        const save = this.turn;
+        this.turn = color;
+        const lm = this.getLegalMoves(r,c);
+        this.turn = save;
+        lm.forEach(m=>moves.push({from:{r,c},to:m}));
+      }
+    }
+    return moves;
+  }
+
+  getPseudoMoves(r,c,piece,attackOnly=false) {
+    const moves = [];
+    const {type,color} = piece;
+    const opp = color===WHITE?BLACK:WHITE;
+    const add = (nr,nc,extra={})=> { if(nr>=0&&nr<8&&nc>=0&&nc<8) moves.push({r:nr,c:nc,...extra}); };
+    const slide = (dr,dc)=> {
+      let nr=r+dr,nc=c+dc;
+      while(nr>=0&&nr<8&&nc>=0&&nc<8) {
+        const t=this.getPiece(nr,nc);
+        if(t) { if(t.color===opp) add(nr,nc); break; }
+        add(nr,nc); nr+=dr; nc+=dc;
+      }
+    };
+    switch(type) {
+      case 'p': {
+        const dir = color===WHITE?-1:1;
+        const startRow = color===WHITE?6:1;
+        if(!attackOnly) {
+          // Forward
+          if(!this.getPiece(r+dir,c)) {
+            add(r+dir,c);
+            if(r===startRow&&!this.getPiece(r+2*dir,c)) add(r+2*dir,c,{doublePush:true});
+          }
+        }
+        // Captures
+        [-1,1].forEach(dc=>{
+          const tr = r + dir;
+          const tc = c + dc;
+          const t=this.getPiece(tr,tc);
+          if(attackOnly) {
+            add(tr,tc,{capture:!!t});
+            return;
+          }
+          if(t&&t.color===opp) add(tr,tc,{capture:true});
+          // En passant
+          if(this.enPassantTarget&&this.enPassantTarget.r===r+dir&&this.enPassantTarget.c===c+dc)
+            add(r+dir,c+dc,{enPassant:true});
+        });
+        break;
+      }
+      case 'r': slide(-1,0);slide(1,0);slide(0,-1);slide(0,1); break;
+      case 'b': slide(-1,-1);slide(-1,1);slide(1,-1);slide(1,1); break;
+      case 'q': slide(-1,0);slide(1,0);slide(0,-1);slide(0,1);slide(-1,-1);slide(-1,1);slide(1,-1);slide(1,1); break;
+      case 'n':
+        [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{
+          const t=this.getPiece(r+dr,c+dc);
+          if(!t||t.color===opp) add(r+dr,c+dc);
+        }); break;
+      case 'k': {
+        [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{
+          const t=this.getPiece(r+dr,c+dc);
+          if(!t||t.color===opp) add(r+dr,c+dc);
+        });
+        // Castling
+        if(!attackOnly && this.castlingRights[color]) {
+          const row = color===WHITE?7:0;
+          if(r===row&&c===4) {
+            const cr = this.castlingRights[color];
+            // Kingside
+            if(cr.k&&!this.getPiece(row,5)&&!this.getPiece(row,6)) {
+              const rookk = this.getPiece(row,7);
+              if(rookk&&rookk.type==='r'&&rookk.color===color) {
+                if(!this.isSquareAttacked(row,4,opp)&&!this.isSquareAttacked(row,5,opp)&&!this.isSquareAttacked(row,6,opp))
+                  add(row,6,{castle:'k'});
+              }
+            }
+            // Queenside
+            if(cr.q&&!this.getPiece(row,3)&&!this.getPiece(row,2)&&!this.getPiece(row,1)) {
+              const rookq = this.getPiece(row,0);
+              if(rookq&&rookq.type==='r'&&rookq.color===color) {
+                if(!this.isSquareAttacked(row,4,opp)&&!this.isSquareAttacked(row,3,opp)&&!this.isSquareAttacked(row,2,opp))
+                  add(row,2,{castle:'q'});
+              }
+            }
+          }
+        }
+        break;
+      }
+    }
+    return moves;
+  }
+
+  isSquareAttacked(r,c,byColor) {
+    for(let fr=0;fr<8;fr++) for(let fc=0;fc<8;fc++) {
+      const p=this.getPiece(fr,fc);
+      if(!p||p.color!==byColor) continue;
+      const pm=this.getPseudoMoves(fr,fc,p,true);
+      if(pm.some(m=>m.r===r&&m.c===c)) return true;
+    }
+    return false;
+  }
+
+  isInCheck(color) {
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+      const p=this.getPiece(r,c);
+      if(p&&p.type==='k'&&p.color===color) return this.isSquareAttacked(r,c,color===WHITE?BLACK:WHITE);
+    }
+    return false;
+  }
+
+  wouldBeInCheck(fr,fc,tr,tc,move) {
+    const saveBoard = this.board.map(row=>[...row]);
+    const saveEP = this.enPassantTarget;
+    const saveCR = JSON.parse(JSON.stringify(this.castlingRights));
+    const movingColor = this.board[fr][fc] ? this.board[fr][fc].color : null;
+    if(!movingColor) return false;
+    this.applyMoveInternal(fr,fc,tr,tc,move,'q');
+    const inCheck = this.isInCheck(movingColor);
+    this.board = saveBoard;
+    this.enPassantTarget = saveEP;
+    this.castlingRights = saveCR;
+    return inCheck;
+  }
+
+  applyMoveInternal(fr,fc,tr,tc,move,promoType) {
+    const piece = this.board[fr][fc];
+    if(!piece) return;
+    const cap = this.board[tr][tc];
+    this.board[tr][tc] = piece;
+    this.board[fr][fc] = null;
+    // En passant capture
+    if(move&&move.enPassant) {
+      const capRow = piece.color===WHITE?tr+1:tr-1;
+      this.board[capRow][tc] = null;
+    }
+    // Castling rook
+    if(move&&move.castle) {
+      const row=fr;
+      if(move.castle==='k') { this.board[row][5]=this.board[row][7]; this.board[row][7]=null; }
+      else { this.board[row][3]=this.board[row][0]; this.board[row][0]=null; }
+    }
+    // Promotion
+    if(piece.type==='p'&&(tr===0||tr===7)) {
+      this.board[tr][tc]={type:promoType||'q',color:piece.color};
+    }
+    // En passant target
+    this.enPassantTarget = (move&&move.doublePush) ? {r:(fr+tr)/2,c:fc} : null;
+    // Castling rights
+    if(piece.type==='k') this.castlingRights[piece.color]={k:false,q:false};
+    if(piece.type==='r') {
+      if(fc===0) this.castlingRights[piece.color].q=false;
+      if(fc===7) this.castlingRights[piece.color].k=false;
+    }
+    return cap;
+  }
+
+  makeMove(fr,fc,tr,tc,move,promoType='q') {
+    const piece = this.board[fr][fc];
+    if(!piece) return false;
+    const saveBoard = this.board.map(row=>[...row]);
+    const saveEP = this.enPassantTarget;
+    const saveCR = JSON.parse(JSON.stringify(this.castlingRights));
+    const saveTurn = this.turn;
+    let captured = null;
+    // En passant captured piece
+    if(move&&move.enPassant) {
+      const capRow = piece.color===WHITE?tr+1:tr-1;
+      captured = this.board[capRow][tc];
+    } else {
+      captured = this.board[tr][tc];
+    }
+    this.applyMoveInternal(fr,fc,tr,tc,move,promoType);
+    this.moveHistory.push({
+      board:saveBoard, ep:saveEP, cr:saveCR, turn:saveTurn,
+      from:{r:fr,c:fc}, to:{r:tr,c:tc}, move, captured,
+      capturedByWhite:[...this.capturedByWhite],
+      capturedByBlack:[...this.capturedByBlack]
+    });
+    if(captured) {
+      if(piece.color===WHITE) this.capturedByWhite.push(captured);
+      else this.capturedByBlack.push(captured);
+    }
+    this.turn = this.turn===WHITE?BLACK:WHITE;
+    return true;
+  }
+
+  undoMove() {
+    if(!this.moveHistory.length) return false;
+    const h = this.moveHistory.pop();
+    this.board = h.board;
+    this.enPassantTarget = h.ep;
+    this.castlingRights = h.cr;
+    this.turn = h.turn;
+    this.capturedByWhite = h.capturedByWhite;
+    this.capturedByBlack = h.capturedByBlack;
+    return h;
+  }
+
+  isCheckmate(color) {
+    if(!this.isInCheck(color)) return false;
+    return this.getAllLegalMoves(color).length===0;
+  }
+  isStalemate(color) {
+    if(this.isInCheck(color)) return false;
+    return this.getAllLegalMoves(color).length===0;
+  }
+  isInsufficientMaterial() {
+    const pieces=[];
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++) { const p=this.getPiece(r,c); if(p) pieces.push(p); }
+    if(pieces.length===2) return true;
+    if(pieces.length===3&&pieces.some(p=>p.type==='n'||p.type==='b')) return true;
+    return false;
+  }
+
+  getBoardFEN() {
+    let fen='';
+    for(let r=0;r<8;r++) {
+      let empty=0;
+      for(let c=0;c<8;c++) {
+        const p=this.board[r][c];
+        if(!p) empty++;
+        else {
+          if(empty) {fen+=empty;empty=0;}
+          fen+=p.color===WHITE?p.type.toUpperCase():p.type;
+        }
+      }
+      if(empty) fen+=empty;
+      if(r<7) fen+='/';
+    }
+    return fen;
+  }
+}
+
+// ============================================================
+// AI ENGINE
+// ============================================================
+const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
+const PST = {
+  p: [
+    [0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],
+    [5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],
+    [5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]
+  ],
+  n: [
+    [-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],
+    [-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],
+    [-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],
+    [-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]
+  ],
+  b: [
+    [-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],
+    [-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],
+    [-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],
+    [-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]
+  ],
+  r: [
+    [0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],
+    [-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],
+    [-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]
+  ],
+  q: [
+    [-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],
+    [-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],
+    [0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],
+    [-10,0,5,0,0,0,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]
+  ],
+  k: [
+    [-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],
+    [-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],
+    [-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],
+    [20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]
+  ]
+};
+
+const CHECKMATE_SCORE = 100000;
+const QUIESCENCE_CAP_DEPTH = 6;
+const HARD_MIN_THINK_MS = 900;
+const HARD_MAX_THINK_MS = 2400;
+
+function mirrorRowForColor(row, color) {
+  return color === WHITE ? row : 7 - row;
+}
+
+function getPositionKey(engine) {
+  const ep = engine.enPassantTarget ? `${engine.enPassantTarget.r}${engine.enPassantTarget.c}` : '-';
+  const crw = engine.castlingRights.w;
+  const crb = engine.castlingRights.b;
+  const cr = `${crw.k?'K':''}${crw.q?'Q':''}${crb.k?'k':''}${crb.q?'q':''}` || '-';
+  return `${engine.getBoardFEN()} ${engine.turn} ${cr} ${ep}`;
+}
+
+function moveToKey(m) {
+  return `${m.from.r}${m.from.c}${m.to.r}${m.to.c}${m.to.promotion||''}${m.to.castle||''}${m.to.enPassant?'e':''}`;
+}
+
+function evaluateBoard(engine, quick=false) {
+  let score = 0;
+  let whiteBishops = 0;
+  let blackBishops = 0;
+  let whiteKing = null;
+  let blackKing = null;
+
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = engine.getPiece(r,c);
+    if(!p) continue;
+    const base = PIECE_VALUES[p.type];
+    const pstRow = mirrorRowForColor(r, p.color);
+    const pst = PST[p.type] ? PST[p.type][pstRow][c] : 0;
+    const sign = p.color===WHITE ? 1 : -1;
+    score += sign * (base + pst);
+
+    if(p.type==='b') {
+      if(p.color===WHITE) whiteBishops++;
+      else blackBishops++;
+    }
+    if(p.type==='k') {
+      if(p.color===WHITE) whiteKing = {r,c};
+      else blackKing = {r,c};
+    }
+
+    // Passed pawn bonus
+    if(p.type==='p') {
+      const dir = p.color===WHITE ? -1 : 1;
+      let passed = true;
+      for(let rr=r+dir; rr>=0&&rr<8; rr+=dir) {
+        for(let dc=-1; dc<=1; dc++) {
+          const cc = c+dc;
+          if(cc<0||cc>7) continue;
+          const t = engine.getPiece(rr,cc);
+          if(t && t.type==='p' && t.color!==p.color) {
+            passed = false;
+          }
+        }
+      }
+      if(passed) {
+        const advance = p.color===WHITE ? (6-r) : (r-1);
+        score += sign * (18 + advance*5);
+      }
+    }
+  }
+
+  if(whiteBishops>=2) score += 30;
+  if(blackBishops>=2) score -= 30;
+
+  if(!quick) {
+    const whiteMob = engine.getAllLegalMoves(WHITE).length;
+    const blackMob = engine.getAllLegalMoves(BLACK).length;
+    score += (whiteMob - blackMob) * 4;
+
+    // King safety: penalize attacked king ring squares.
+    if(whiteKing) {
+      let danger = 0;
+      for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) {
+        if(dr===0&&dc===0) continue;
+        const rr = whiteKing.r + dr, cc = whiteKing.c + dc;
+        if(rr<0||rr>7||cc<0||cc>7) continue;
+        if(engine.isSquareAttacked(rr,cc,BLACK)) danger++;
+      }
+      score -= danger * 12;
+    }
+    if(blackKing) {
+      let danger = 0;
+      for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) {
+        if(dr===0&&dc===0) continue;
+        const rr = blackKing.r + dr, cc = blackKing.c + dc;
+        if(rr<0||rr>7||cc<0||cc>7) continue;
+        if(engine.isSquareAttacked(rr,cc,WHITE)) danger++;
+      }
+      score += danger * 12;
+    }
+  }
+
+  return score;
+}
+
+function evaluateFromSide(engine) {
+  const base = evaluateBoard(engine, true);
+  return engine.turn===WHITE ? base : -base;
+}
+
+function shouldStopSearch(ctx) {
+  ctx.nodes++;
+  if((ctx.nodes & 511)===0 && performance.now() > ctx.deadline) {
+    ctx.timeUp = true;
+  }
+  return ctx.timeUp;
+}
+
+function getCapturePiece(engine, move) {
+  if(move.to.enPassant) {
+    const mover = engine.getPiece(move.from.r, move.from.c);
+    if(!mover) return null;
+    const capRow = mover.color===WHITE ? move.to.r+1 : move.to.r-1;
+    return engine.getPiece(capRow, move.to.c);
+  }
+  return engine.getPiece(move.to.r, move.to.c);
+}
+
+function scoreMove(engine, move, ply, ctx) {
+  const mover = engine.getPiece(move.from.r, move.from.c);
+  if(!mover) return -999999;
+
+  const key = moveToKey(move);
+  if(ctx.ttBestMove && ctx.ttBestMove===key) return 1000000;
+  if(ctx.killers[ply] && ctx.killers[ply][0]===key) return 900000;
+  if(ctx.killers[ply] && ctx.killers[ply][1]===key) return 800000;
+
+  let score = 0;
+  const captured = getCapturePiece(engine, move);
+  if(captured) {
+    const victimVal = PIECE_VALUES[captured.type] || 0;
+    const attackerVal = PIECE_VALUES[mover.type] || 0;
+    score += 10000 + victimVal*16 - attackerVal;
+  }
+  if(mover.type==='p' && (move.to.r===0 || move.to.r===7)) score += 8500;
+  if(move.to.castle) score += 250;
+
+  const histKey = `${mover.type}${move.to.r}${move.to.c}`;
+  score += (ctx.history[histKey] || 0);
+  return score;
+}
+
+function orderMoves(engine, moves, ply, ctx) {
+  moves.sort((a,b)=>scoreMove(engine,b,ply,ctx)-scoreMove(engine,a,ply,ctx));
+}
+
+function quiescence(engine, alpha, beta, ply, ctx, capDepth=0) {
+  if(shouldStopSearch(ctx)) return evaluateFromSide(engine);
+
+  let standPat = evaluateFromSide(engine);
+  if(standPat >= beta) return beta;
+  if(standPat > alpha) alpha = standPat;
+  if(capDepth >= QUIESCENCE_CAP_DEPTH) return standPat;
+
+  const side = engine.turn;
+  const moves = engine.getAllLegalMoves(side).filter(m => {
+    const cap = getCapturePiece(engine, m);
+    const isPromo = engine.getPiece(m.from.r,m.from.c)?.type==='p' && (m.to.r===0 || m.to.r===7);
+    return !!cap || isPromo;
+  });
+  if(!moves.length) return standPat;
+
+  orderMoves(engine, moves, ply, ctx);
+  for(const m of moves) {
+    engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+    const score = -quiescence(engine, -beta, -alpha, ply+1, ctx, capDepth+1);
+    engine.undoMove();
+    if(score >= beta) return beta;
+    if(score > alpha) alpha = score;
+  }
+  return alpha;
+}
+
+function negamax(engine, depth, alpha, beta, ply, ctx) {
+  if(shouldStopSearch(ctx)) return evaluateFromSide(engine);
+  const alphaOrig = alpha;
+  const key = getPositionKey(engine);
+  const ttEntry = ctx.tt.get(key);
+  ctx.ttBestMove = ttEntry ? ttEntry.bestMove : null;
+
+  if(ttEntry && ttEntry.depth >= depth) {
+    if(ttEntry.flag==='exact') return ttEntry.score;
+    if(ttEntry.flag==='lower') alpha = Math.max(alpha, ttEntry.score);
+    else if(ttEntry.flag==='upper') beta = Math.min(beta, ttEntry.score);
+    if(alpha>=beta) return ttEntry.score;
+  }
+
+  const side = engine.turn;
+  const legalMoves = engine.getAllLegalMoves(side);
+  if(!legalMoves.length) {
+    if(engine.isInCheck(side)) return -CHECKMATE_SCORE + ply;
+    return 0;
+  }
+  if(engine.isInsufficientMaterial()) return 0;
+
+  if(depth<=0) return quiescence(engine, alpha, beta, ply, ctx);
+
+  orderMoves(engine, legalMoves, ply, ctx);
+  let bestScore = -Infinity;
+  let bestMoveKey = null;
+
+  for(const m of legalMoves) {
+    engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+    let ext = 0;
+    if(engine.isInCheck(engine.turn)) ext = 1;
+    const score = -negamax(engine, depth-1+ext, -beta, -alpha, ply+1, ctx);
+    engine.undoMove();
+    if(ctx.timeUp) return alpha;
+
+    if(score > bestScore) {
+      bestScore = score;
+      bestMoveKey = moveToKey(m);
+    }
+    if(score > alpha) alpha = score;
+    if(alpha >= beta) {
+      const mover = engine.getPiece(m.from.r,m.from.c);
+      if(mover) {
+        const histKey = `${mover.type}${m.to.r}${m.to.c}`;
+        ctx.history[histKey] = (ctx.history[histKey] || 0) + depth*depth;
+      }
+      const cap = getCapturePiece(engine,m);
+      if(!cap) {
+        const killerKey = moveToKey(m);
+        ctx.killers[ply] = ctx.killers[ply] || [];
+        if(ctx.killers[ply][0]!==killerKey) {
+          ctx.killers[ply][1] = ctx.killers[ply][0];
+          ctx.killers[ply][0] = killerKey;
+        }
+      }
+      break;
+    }
+  }
+
+  let flag = 'exact';
+  if(bestScore <= alphaOrig) flag = 'upper';
+  else if(bestScore >= beta) flag = 'lower';
+  ctx.tt.set(key, {depth, score:bestScore, flag, bestMove:bestMoveKey});
+  return bestScore;
+}
+
+function openingReplyHard(engine) {
+  // Simple opening repertoire as black for stronger early game stability.
+  const h = engine.moveHistory;
+  if(h.length!==1 || engine.turn!==BLACK) return null;
+  const wm = h[0];
+  const from = `${wm.from.r}${wm.from.c}`;
+  const to = `${wm.to.r}${wm.to.c}`;
+  const whiteMove = `${from}-${to}`;
+  const replies = {
+    '64-44': {fr:1,fc:4,tr:3,tc:4}, // 1.e4 -> ...e5
+    '63-43': {fr:1,fc:3,tr:3,tc:3}, // 1.d4 -> ...d5
+    '62-42': {fr:1,fc:2,tr:3,tc:2}, // 1.c4 -> ...c5
+    '66-46': {fr:1,fc:6,tr:3,tc:6}, // 1.g4 -> ...g5
+    '61-41': {fr:1,fc:2,tr:2,tc:2}  // 1.b4 -> ...c6
+  };
+  const rep = replies[whiteMove];
+  if(!rep) return null;
+  const legal = engine.getAllLegalMoves(BLACK);
+  return legal.find(m=>m.from.r===rep.fr&&m.from.c===rep.fc&&m.to.r===rep.tr&&m.to.c===rep.tc) || null;
+}
+
+function getBestMoveByDifficulty(engine, difficulty) {
+  const legal = engine.getAllLegalMoves(BLACK);
+  if(!legal.length) return null;
+
+  if(difficulty==='easy') {
+    const scored = legal.map(m=>{
+      engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+      const s = evaluateBoard(engine);
+      engine.undoMove();
+      return {m,s};
+    }).sort((a,b)=>a.s-b.s); // lower score better for black
+    const take = Math.min(4, scored.length);
+    const idx = Math.floor(Math.random()*take);
+    return scored[idx].m;
+  }
+
+  if(difficulty==='medium') {
+    let best = null;
+    let bestVal = Infinity;
+    for(const m of legal) {
+      engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+      const val = evaluateBoard(engine);
+      engine.undoMove();
+      if(val < bestVal) { bestVal = val; best = m; }
+    }
+    return best;
+  }
+
+  const openingMove = openingReplyHard(engine);
+  if(openingMove) return openingMove;
+
+  const ctx = {
+    nodes: 0,
+    timeUp: false,
+    deadline: performance.now() + Math.min(HARD_MAX_THINK_MS, Math.max(HARD_MIN_THINK_MS, 1100 + engine.moveHistory.length*20)),
+    tt: new Map(),
+    history: Object.create(null),
+    killers: [],
+    ttBestMove: null
+  };
+
+  let bestMove = legal[0];
+  const maxDepth = 6;
+
+  for(let depth=1; depth<=maxDepth; depth++) {
+    if(ctx.timeUp) break;
+    const rootMoves = [...legal];
+    orderMoves(engine, rootMoves, 0, ctx);
+
+    let localBest = null;
+    let localBestScore = -Infinity;
+    for(const m of rootMoves) {
+      engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+      const score = -negamax(engine, depth-1, -Infinity, Infinity, 1, ctx);
+      engine.undoMove();
+      if(ctx.timeUp) break;
+      if(score > localBestScore) {
+        localBestScore = score;
+        localBest = m;
+      }
+    }
+    if(!ctx.timeUp && localBest) {
+      bestMove = localBest;
+    }
+  }
+
+  return bestMove || legal[0];
+}
+
+// ============================================================
+// THREE.JS RENDERER
+// ============================================================
+let scene, camera, renderer, raycaster, mouse;
+let boardGroup, pieceObjects = {}, highlightObjects = [], lastMoveHighlights = [];
+let selectedSquare = null, legalMovesCache = [];
+let tournamentClockInterval = null;
+let pendingPromotion = null;
+let isAnimating = false;
+let tutorialSequenceToken = 0;
+let tutorialStepResolver = null;
+let hasManualCameraControl = false;
+const SQUARE_SIZE = 1, BOARD_OFFSET = 3.5;
+
+function initThree() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x070707);
+  scene.fog = new THREE.FogExp2(0x070707, 0.05);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.set(0, 9, 7);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xFFE9A0, 0.4);
+  scene.add(ambient);
+
+  const mainLight = new THREE.DirectionalLight(0xFFD700, 1.5);
+  mainLight.position.set(5, 12, 5);
+  mainLight.castShadow = true;
+  mainLight.shadow.mapSize.set(2048, 2048);
+  scene.add(mainLight);
+
+  const fillLight = new THREE.PointLight(0xFFAA00, 0.8, 30);
+  fillLight.position.set(-5, 8, -5);
+  scene.add(fillLight);
+
+  const rimLight = new THREE.PointLight(0xFFCC44, 0.5, 20);
+  rimLight.position.set(0, 3, -8);
+  scene.add(rimLight);
+
+  // Board
+  buildBoard();
+  // Particle system
+  addParticles();
+
+  window.addEventListener('resize', onResize);
+  setupCameraControls();
+  animate();
+}
+
+function buildBoard() {
+  boardGroup = new THREE.Group();
+  scene.add(boardGroup);
+
+  // Board base
+  const baseGeo = new THREE.BoxGeometry(9.2, 0.3, 9.2);
+  const baseMat = new THREE.MeshStandardMaterial({
+    color: 0x0A0A0A, metalness: 0.8, roughness: 0.2
+  });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.position.y = -0.2;
+  base.receiveShadow = true;
+  boardGroup.add(base);
+
+  // Border glow
+  const borderGeo = new THREE.BoxGeometry(9.4, 0.08, 9.4);
+  const borderMat = new THREE.MeshStandardMaterial({
+    color: 0xD4AF37, metalness: 1, roughness: 0.1, emissive: 0xD4AF37, emissiveIntensity: 0.3
+  });
+  const border = new THREE.Mesh(borderGeo, borderMat);
+  border.position.y = -0.05;
+  boardGroup.add(border);
+
+  // Squares
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const isLight = (r+c)%2===1;
+    const geo = new THREE.BoxGeometry(SQUARE_SIZE, 0.08, SQUARE_SIZE);
+    const mat = new THREE.MeshStandardMaterial({
+      color: isLight ? 0x8B6914 : 0x1A1A1A,
+      metalness: isLight ? 0.6 : 0.3,
+      roughness: isLight ? 0.3 : 0.6,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(c-BOARD_OFFSET, 0, r-BOARD_OFFSET);
+    mesh.receiveShadow = true;
+    mesh.userData = {type:'square',r,c};
+    boardGroup.add(mesh);
+  }
+
+  addBoardCoordinates();
+}
+
+function createBoardLabelSprite(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) return null;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '700 86px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeStyle = 'rgba(8,8,8,0.85)';
+  ctx.lineWidth = 12;
+  ctx.strokeText(text, canvas.width / 2, canvas.height / 2 + 2);
+  ctx.fillStyle = '#DCC372';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.5, 0.5, 1);
+  return sprite;
+}
+
+function addBoardCoordinates() {
+  const files = 'abcdefgh';
+  for(let i=0; i<8; i++) {
+    const fileLabel = createBoardLabelSprite(files[i]);
+    if(fileLabel) {
+      fileLabel.position.set(i - BOARD_OFFSET, 0.16, BOARD_OFFSET + 0.8);
+      boardGroup.add(fileLabel);
+    }
+    const rankLabel = createBoardLabelSprite(String(8 - i));
+    if(rankLabel) {
+      rankLabel.position.set(-BOARD_OFFSET - 0.8, 0.16, i - BOARD_OFFSET);
+      boardGroup.add(rankLabel);
+    }
+  }
+}
+
+function addParticles() {
+  // Gold dust particles near board
+  const geo = new THREE.BufferGeometry();
+  const count = 300;
+  const pos = new Float32Array(count*3);
+  const sizes = new Float32Array(count);
+  for(let i=0;i<count;i++) {
+    pos[i*3]=(Math.random()-0.5)*16;
+    pos[i*3+1]=Math.random()*12;
+    pos[i*3+2]=(Math.random()-0.5)*16;
+    sizes[i]=Math.random()*0.08+0.02;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({color:0xD4AF37,size:0.06,transparent:true,opacity:0.5,sizeAttenuation:true});
+  const pts = new THREE.Points(geo,mat);
+  pts.userData.isParticles=true;
+  scene.add(pts);
+
+  // Starfield far away
+  const starGeo = new THREE.BufferGeometry();
+  const starCount=500;
+  const starPos=new Float32Array(starCount*3);
+  for(let i=0;i<starCount*3;i+=3){
+    starPos[i]=(Math.random()-0.5)*80;
+    starPos[i+1]=Math.random()*40+5;
+    starPos[i+2]=(Math.random()-0.5)*80;
+  }
+  starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
+  const starMat=new THREE.PointsMaterial({color:0xFFFFEE,size:0.08,transparent:true,opacity:0.3});
+  scene.add(new THREE.Points(starGeo,starMat));
+}
+
+// ============================================================
+// PIECE GEOMETRY
+// ============================================================
+function createPieceGeometry(type) {
+  let geo;
+  switch(type) {
+    case 'p': {
+      const cyl1 = new THREE.CylinderGeometry(0.18,0.22,0.15,16);
+      const cyl2 = new THREE.CylinderGeometry(0.1,0.18,0.3,16);
+      const sph = new THREE.SphereGeometry(0.18,16,16);
+      const merged = mergeGeometries([
+        translateGeo(cyl1,0,0.075,0),
+        translateGeo(cyl2,0,0.3,0),
+        translateGeo(sph,0,0.55,0)
+      ]);
+      return merged;
+    }
+    case 'r': {
+      const base = new THREE.CylinderGeometry(0.22,0.26,0.12,16);
+      const body = new THREE.CylinderGeometry(0.18,0.22,0.5,16);
+      const top = new THREE.CylinderGeometry(0.22,0.18,0.12,16);
+      const castle = new THREE.BoxGeometry(0.12,0.15,0.12);
+      return mergeGeometries([
+        translateGeo(base,0,0.06,0),
+        translateGeo(body,0,0.37,0),
+        translateGeo(top,0,0.68,0),
+        translateGeo(castle,-0.1,0.82,0),
+        translateGeo(castle,0.1,0.82,0)
+      ]);
+    }
+    case 'n': {
+      const base = new THREE.CylinderGeometry(0.22,0.26,0.12,16);
+      const body = new THREE.CylinderGeometry(0.15,0.22,0.35,16);
+      const head = new THREE.BoxGeometry(0.18,0.3,0.28);
+      const snout = new THREE.BoxGeometry(0.12,0.12,0.2);
+      return mergeGeometries([
+        translateGeo(base,0,0.06,0),
+        translateGeo(body,0,0.295,0),
+        translateGeo(head,0,0.6,0.05),
+        translateGeo(snout,0,0.56,0.22)
+      ]);
+    }
+    case 'b': {
+      const base = new THREE.CylinderGeometry(0.22,0.26,0.12,16);
+      const body = new THREE.CylinderGeometry(0.12,0.2,0.45,16);
+      const head = new THREE.SphereGeometry(0.15,16,16);
+      const tip = new THREE.ConeGeometry(0.05,0.12,8);
+      return mergeGeometries([
+        translateGeo(base,0,0.06,0),
+        translateGeo(body,0,0.345,0),
+        translateGeo(head,0,0.68,0),
+        translateGeo(tip,0,0.87,0)
+      ]);
+    }
+    case 'q': {
+      const base = new THREE.CylinderGeometry(0.24,0.28,0.14,16);
+      const body = new THREE.CylinderGeometry(0.14,0.22,0.5,16);
+      const mid = new THREE.SphereGeometry(0.18,16,16);
+      const crown = new THREE.CylinderGeometry(0.22,0.18,0.12,16);
+      const jewels = [];
+      for(let i=0;i<5;i++) {
+        const angle = (i/5)*Math.PI*2;
+        jewels.push(translateGeo(new THREE.SphereGeometry(0.06,8,8), Math.cos(angle)*0.18, 0.98+0.06, Math.sin(angle)*0.18));
+      }
+      return mergeGeometries([translateGeo(base,0,0.07,0),translateGeo(body,0,0.42,0),translateGeo(mid,0,0.72,0),translateGeo(crown,0,0.85,0),...jewels]);
+    }
+    case 'k': {
+      const base = new THREE.CylinderGeometry(0.25,0.29,0.14,16);
+      const body = new THREE.CylinderGeometry(0.15,0.23,0.52,16);
+      const mid = new THREE.CylinderGeometry(0.2,0.15,0.12,16);
+      const crossV = new THREE.BoxGeometry(0.08,0.3,0.08);
+      const crossH = new THREE.BoxGeometry(0.22,0.08,0.08);
+      return mergeGeometries([
+        translateGeo(base,0,0.07,0),
+        translateGeo(body,0,0.43,0),
+        translateGeo(mid,0,0.75,0),
+        translateGeo(crossV,0,0.97,0),
+        translateGeo(crossH,0,1.03,0)
+      ]);
+    }
+    default: return new THREE.SphereGeometry(0.25,16,16);
+  }
+}
+
+function translateGeo(geo, x, y, z) {
+  const g = geo.clone();
+  g.translate(x, y, z);
+  return g;
+}
+
+function mergeGeometries(geos) {
+  // Merge as non-indexed geometry to keep faces correct.
+  const normalized = geos.map(g => {
+    const gg = g.clone();
+    return gg.index ? gg.toNonIndexed() : gg;
+  });
+  const merged = new THREE.BufferGeometry();
+  let totalVerts = 0;
+  normalized.forEach(g=>{ totalVerts += g.attributes.position.count; });
+  const positions = new Float32Array(totalVerts*3);
+  const normals = new Float32Array(totalVerts*3);
+  let offset = 0;
+  normalized.forEach(g => {
+    const p = g.attributes.position.array;
+    const n = g.attributes.normal ? g.attributes.normal.array : new Float32Array(p.length);
+    positions.set(p, offset*3);
+    normals.set(n, offset*3);
+    offset += g.attributes.position.count;
+  });
+  merged.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(normals,3));
+  merged.computeVertexNormals();
+  return merged;
+}
+
+function createPieceMesh(type, color) {
+  const geo = createPieceGeometry(type);
+  let mat;
+  if(color===WHITE) {
+    mat = new THREE.MeshStandardMaterial({
+      color: 0xE9D8A6,
+      metalness: 0.55,
+      roughness: 0.2,
+      emissive: 0x7A5D23,
+      emissiveIntensity: 0.1
+    });
+  } else {
+    mat = new THREE.MeshStandardMaterial({
+      color: 0x2B3038,
+      metalness: 0.5,
+      roughness: 0.35,
+      emissive: 0x0E1117,
+      emissiveIntensity: 0.22
+    });
+  }
+  const mesh = new THREE.Mesh(geo, mat);
+  const edgeColor = color===WHITE ? 0x5B4213 : 0xE7B449;
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 28),
+    new THREE.LineBasicMaterial({color: edgeColor, transparent:true, opacity:0.45})
+  );
+  mesh.add(edge);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function squareToWorld(r, c) {
+  return { x: c - BOARD_OFFSET, y: 0.08, z: r - BOARD_OFFSET };
+}
+
+function renderBoard() {
+  // Remove old pieces
+  Object.values(pieceObjects).forEach(obj => boardGroup.remove(obj));
+  pieceObjects = {};
+  const engine = chessGame.engine;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = engine.getPiece(r,c);
+    if(!p) continue;
+    const mesh = createPieceMesh(p.type, p.color);
+    const pos = squareToWorld(r,c);
+    mesh.position.set(pos.x, pos.y, pos.z);
+    mesh.userData = {type:'piece', r, c, piece:p};
+    boardGroup.add(mesh);
+    pieceObjects[`${r},${c}`] = mesh;
+  }
+  renderHighlights();
+  updateCapturedDisplay();
+}
+
+function renderHighlights() {
+  // Remove old highlights
+  highlightObjects.forEach(h => boardGroup.remove(h));
+  highlightObjects = [];
+
+  // Selected square
+  if(selectedSquare) {
+    addHighlight(selectedSquare.r, selectedSquare.c, 0xFFD700, 0.7, 'selected');
+    if(!chessGame.tournamentMode) {
+      // Legal moves
+      legalMovesCache.forEach(m => {
+        const hasPiece = chessGame.engine.getPiece(m.r, m.c);
+        addHighlight(m.r, m.c, hasPiece ? 0xFF4400 : 0xFFD700, 0.35, 'legal');
+      });
+    }
+  }
+  // Last move
+  lastMoveHighlights.forEach(sq => {
+    addHighlight(sq.r, sq.c, 0xC0C0C0, 0.3, 'lastmove');
+  });
+}
+
+function addHighlight(r, c, color, opacity, type) {
+  const geo = new THREE.PlaneGeometry(SQUARE_SIZE*0.92, SQUARE_SIZE*0.92);
+  const mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity, depthWrite:false});
+  const mesh = new THREE.Mesh(geo, mat);
+  const pos = squareToWorld(r,c);
+  mesh.position.set(pos.x, 0.05, pos.z);
+  mesh.rotation.x = -Math.PI/2;
+  mesh.userData = {highlightType: type};
+  boardGroup.add(mesh);
+  highlightObjects.push(mesh);
+
+  if(type==='legal') {
+    const ringGeo = new THREE.RingGeometry(0.28, 0.38, 32);
+    const ringMat = new THREE.MeshBasicMaterial({color:0xFFD700, transparent:true, opacity:0.8, depthWrite:false, side:THREE.DoubleSide});
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(pos.x, 0.06, pos.z);
+    ring.rotation.x = -Math.PI/2;
+    boardGroup.add(ring);
+    highlightObjects.push(ring);
+  }
+}
+
+// ============================================================
+// CAMERA CONTROLS
+// ============================================================
+let camTheta = 0, camPhi = Math.PI/3.5, camRadius = 11;
+let isDragging = false, lastMouse = {x:0,y:0};
+let pinchDist = 0;
+
+function setupCameraControls() {
+  const el = renderer.domElement;
+  el.addEventListener('mousedown', onMouseDown);
+  el.addEventListener('mousemove', onMouseMove);
+  el.addEventListener('mouseup', onMouseUp);
+  el.addEventListener('wheel', onWheel);
+  el.addEventListener('touchstart', onTouchStart, {passive:false});
+  el.addEventListener('touchmove', onTouchMove, {passive:false});
+  el.addEventListener('touchend', onTouchEnd);
+}
+
+function updateCamera() {
+  camRadius = Math.max(5, Math.min(18, camRadius));
+  camPhi = Math.max(0.3, Math.min(Math.PI/2.1, camPhi));
+  camera.position.x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+  camera.position.y = camRadius * Math.cos(camPhi);
+  camera.position.z = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+  camera.lookAt(0,0,0);
+}
+
+function applyResponsiveCameraPreset(force=false) {
+  if(hasManualCameraControl && !force) return;
+  const isMobile = window.innerWidth <= 768;
+  const isPortrait = window.innerHeight >= window.innerWidth;
+  if(isMobile && isPortrait) {
+    camTheta = 0;
+    camPhi = 1.16;
+    camRadius = 13.6;
+  } else if(isMobile) {
+    camTheta = 0;
+    camPhi = 1.04;
+    camRadius = 12.2;
+  } else {
+    camTheta = 0;
+    camPhi = Math.PI / 3.5;
+    camRadius = 11;
+  }
+  updateCamera();
+}
+
+let rightClickStart = false;
+function onMouseDown(e) {
+  if(e.button===2) { isDragging=true; lastMouse={x:e.clientX,y:e.clientY}; rightClickStart=true; return; }
+  rightClickStart=false;
+}
+function onMouseMove(e) {
+  if(isDragging&&rightClickStart) {
+    const dx=(e.clientX-lastMouse.x)*0.005;
+    const dy=(e.clientY-lastMouse.y)*0.005;
+    camTheta-=dx; camPhi-=dy;
+    hasManualCameraControl = true;
+    updateCamera(); lastMouse={x:e.clientX,y:e.clientY};
+  }
+}
+function onMouseUp(e) {
+  if(e.button===2) { isDragging=false; if(rightClickStart){rightClickStart=false;return;} }
+  if(!rightClickStart&&e.button===0) handleClick(e);
+}
+function onWheel(e) {
+  camRadius += e.deltaY*0.01;
+  hasManualCameraControl = true;
+  updateCamera();
+  e.preventDefault();
+}
+
+let touchStartPos = null, touchStartTime = 0;
+function onTouchStart(e) {
+  e.preventDefault();
+  if(e.touches.length===2) {
+    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    isDragging=false; touchStartPos=null; return;
+  }
+  touchStartPos={x:e.touches[0].clientX,y:e.touches[0].clientY};
+  touchStartTime=Date.now();
+  lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  if(e.touches.length===2) {
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    camRadius-=(d-pinchDist)*0.05; hasManualCameraControl = true; updateCamera(); pinchDist=d; return;
+  }
+  if(!touchStartPos) return;
+  const dx=e.touches[0].clientX-lastMouse.x, dy=e.touches[0].clientY-lastMouse.y;
+  const dist=Math.hypot(e.touches[0].clientX-touchStartPos.x,e.touches[0].clientY-touchStartPos.y);
+  if(dist>8) {
+    camTheta-=dx*0.004; camPhi-=dy*0.004;
+    hasManualCameraControl = true;
+    updateCamera(); isDragging=true;
+  }
+  lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
+}
+function onTouchEnd(e) {
+  if(e.changedTouches.length===1&&touchStartPos&&!isDragging) {
+    const touch=e.changedTouches[0];
+    const dist=Math.hypot(touch.clientX-touchStartPos.x,touch.clientY-touchStartPos.y);
+    if(dist<8&&Date.now()-touchStartTime<300) {
+      const fakeEv={clientX:touch.clientX,clientY:touch.clientY};
+      handleClick(fakeEv);
+    }
+  }
+  isDragging=false; touchStartPos=null;
+}
+
+function handleClick(e) {
+  if(isAnimating||chessGame.engine.turn!==WHITE) return;
+  if(chessGame.tutorialLocked) return;
+  if(document.getElementById('gameover-overlay').style.display==='flex') return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const objects = [...boardGroup.children].filter(o=>o.userData.type==='square'||o.userData.type==='piece');
+  const hits = raycaster.intersectObjects(objects);
+  if(!hits.length) { selectedSquare=null; legalMovesCache=[]; renderHighlights(); return; }
+
+  const hit = hits[0].object;
+  const r = hit.userData.r, c = hit.userData.c;
+
+  if(selectedSquare) {
+    // Try move
+    const move = legalMovesCache.find(m=>m.r===r&&m.c===c);
+    if(move) {
+      const piece = chessGame.engine.getPiece(selectedSquare.r, selectedSquare.c);
+      // Pawn promotion
+      if(piece.type==='p'&&(r===0||r===7)) {
+        pendingPromotion = {fr:selectedSquare.r,fc:selectedSquare.c,tr:r,tc:c,move};
+        document.getElementById('promo-overlay').style.display='flex';
+        selectedSquare=null; legalMovesCache=[];
+        return;
+      }
+      executePlayerMove(selectedSquare.r, selectedSquare.c, r, c, move, 'q');
+      selectedSquare=null; legalMovesCache=[];
+      return;
+    }
+  }
+
+  // Select piece
+  const piece = chessGame.engine.getPiece(r,c);
+  if(piece&&piece.color===WHITE&&chessGame.engine.turn===WHITE) {
+    selectedSquare={r,c};
+    legalMovesCache = chessGame.engine.getLegalMoves(r,c);
+    renderHighlights();
+  } else {
+    selectedSquare=null; legalMovesCache=[]; renderHighlights();
+  }
+}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+function animatePiece(mesh, targetPos, duration, callback) {
+  const startPos = mesh.position.clone();
+  const startTime = performance.now();
+  const peak = Math.max(startPos.distanceTo(new THREE.Vector3(targetPos.x,targetPos.y,targetPos.z))*0.5, 1.5);
+
+  function update() {
+    const elapsed = performance.now()-startTime;
+    const t = Math.min(elapsed/duration, 1);
+    const ease = t<0.5?2*t*t:(1-Math.pow(-2*t+2,2)/2);
+    const arcY = Math.sin(t*Math.PI)*peak;
+    mesh.position.x = startPos.x+(targetPos.x-startPos.x)*ease;
+    mesh.position.y = startPos.y+(targetPos.y-startPos.y)*ease + arcY;
+    mesh.position.z = startPos.z+(targetPos.z-startPos.z)*ease;
+    if(t<1) requestAnimationFrame(update);
+    else { mesh.position.set(targetPos.x,targetPos.y,targetPos.z); if(callback)callback(); }
+  }
+  requestAnimationFrame(update);
+}
+
+function executePlayerMove(fr,fc,tr,tc,move,promo) {
+  isAnimating=true;
+  const engine=chessGame.engine;
+  const fromMesh=pieceObjects[`${fr},${fc}`];
+  const targetPos=squareToWorld(tr,tc);
+
+  // Pre-remove captured piece visual for en passant
+  if(move && move.enPassant) {
+    const movingPiece = engine.getPiece(fr,fc);
+    if(movingPiece) {
+      const capRow = movingPiece.color===WHITE ? tr+1 : tr-1;
+      const epKey = `${capRow},${tc}`;
+      if(pieceObjects[epKey]) {
+        flashAndRemove(pieceObjects[epKey]);
+        delete pieceObjects[epKey];
+      }
+    }
+  }
+
+  if(fromMesh) {
+    // Flash captured piece
+    const capKey=`${tr},${tc}`;
+    if(pieceObjects[capKey] && capKey !== `${fr},${fc}`) {
+      flashAndRemove(pieceObjects[capKey]);
+      delete pieceObjects[capKey];
+    }
+    animatePiece(fromMesh, targetPos, 420, ()=>{
+      engine.makeMove(fr,fc,tr,tc,move,promo);
+      lastMoveHighlights=[{r:fr,c:fc},{r:tr,c:tc}];
+      renderBoard();
+      updateScoreDisplay();
+      updateTournamentDisplay();
+      syncTournamentClock();
+      syncTournamentClock();
+      saveGame();
+      isAnimating=false;
+      checkGameState();
+      if(engine.turn===BLACK&&!isGameOver()) {
+        setTimeout(()=>doAIMove(), 200);
+      }
+    });
+  } else {
+    engine.makeMove(fr,fc,tr,tc,move,promo);
+    lastMoveHighlights=[{r:fr,c:fc},{r:tr,c:tc}];
+    renderBoard(); saveGame();
+    isAnimating=false;
+    checkGameState();
+    if(engine.turn===BLACK&&!isGameOver()) setTimeout(()=>doAIMove(),200);
+  }
+}
+
+function flashAndRemove(mesh) {
+  if(!mesh) return;
+  const startTime = performance.now();
+  function update() {
+    const t = (performance.now()-startTime)/300;
+    if(t<1) {
+      if(mesh.material) mesh.material.opacity = 1-t;
+      mesh.position.y += 0.03;
+      mesh.scale.setScalar(1-t*0.5);
+      requestAnimationFrame(update);
+    } else {
+      boardGroup.remove(mesh);
+    }
+  }
+  if(mesh.material) mesh.material.transparent=true;
+  requestAnimationFrame(update);
+}
+
+// ============================================================
+// AI MOVE
+// ============================================================
+let isGameOverFlag = false;
+function isGameOver() { return isGameOverFlag; }
+
+function performAIMove(best, options={}) {
+  if(!best || isGameOverFlag) return;
+
+  const { skipComment=false, skipDelayMessage=false, forcePromotion='q' } = options;
+  const engine = chessGame.engine;
+  const fromMesh = pieceObjects[`${best.from.r},${best.from.c}`];
+  const targetPos = squareToWorld(best.to.r,best.to.c);
+  const piece = engine.getPiece(best.from.r,best.from.c);
+
+  isAnimating = true;
+  stopTournamentClock();
+
+  const finalizeMove = () => {
+    const clockBeforeMove = { ...chessGame.clocks };
+    engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to,forcePromotion);
+    if(chessGame.tournamentMode) {
+      chessGame.clocks = clockBeforeMove;
+      saveClockSnapshot();
+      applyTournamentIncrement(BLACK);
+    }
+    lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
+    renderBoard();
+    saveGame();
+    isAnimating=false;
+    setStatus('Ваш ход');
+    checkGameState();
+    syncTournamentClock();
+    if(chessGame.trainingMatch && !isGameOverFlag && engine.turn===WHITE) requestTutorialHint(true);
+    if(!isGameOverFlag && !skipComment && piece) getAIComment(best, piece);
+  };
+
+  if(!skipDelayMessage) setStatus('ИИ думает...');
+
+  if(fromMesh) animatePiece(fromMesh, targetPos, 500, finalizeMove);
+  else finalizeMove();
+}
+
+async function doAIMove() {
+  if(isGameOverFlag) return;
+  setStatus('ИИ думает...');
+  const engine=chessGame.engine;
+  const waitMs = chessGame.difficulty==='hard' ? 220 : 140;
+  await new Promise(r=>setTimeout(r,waitMs));
+  const best=getBestMoveByDifficulty(engine,chessGame.difficulty);
+  if(!best) { checkGameState(); return; }
+
+  const fromMesh=pieceObjects[`${best.from.r},${best.from.c}`];
+  const targetPos=squareToWorld(best.to.r,best.to.c);
+  const piece=engine.getPiece(best.from.r,best.from.c);
+
+  isAnimating=true;
+  if(fromMesh) {
+    animatePiece(fromMesh, targetPos, 500, ()=>{
+      engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to);
+      lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
+      renderBoard(); saveGame();
+      isAnimating=false;
+      setStatus('Ваш ход');
+      checkGameState();
+      if(!isGameOverFlag) getAIComment(best, piece);
+    });
+  } else {
+    engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to);
+    lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
+    renderBoard(); saveGame();
+    isAnimating=false;
+    setStatus('Ваш ход');
+    checkGameState();
+    if(!isGameOverFlag) getAIComment(best, piece);
+  }
+}
+
+// ============================================================
+// GAME STATE
+// ============================================================
+function checkGameState() {
+  const engine=chessGame.engine;
+  const color=engine.turn;
+  if(engine.isCheckmate(color)) {
+    isGameOverFlag=true;
+    const winner=color===WHITE?'Чёрные':'Белые';
+    showGameOver('ШАХ И МАТ!', `${winner} победили!`);
+    addChatMessage('system',`Игра завершена: ${winner} победили!`);
+  } else if(engine.isStalemate(color)) {
+    isGameOverFlag=true;
+    showGameOver('ПАТ!','Ничья — у вас нет доступных ходов');
+    addChatMessage('system','Ничья — пат!');
+  } else if(engine.isInsufficientMaterial()) {
+    isGameOverFlag=true;
+    showGameOver('НИЧЬЯ','Недостаточно фигур для мата');
+  } else if(engine.isInCheck(color)) {
+    setStatus(color===WHITE?'Шах вам!':'Шах чёрному королю!');
+    addChatMessage('system',color===WHITE?'Вашему королю объявлен шах!':'Шах чёрному королю!');
+  } else {
+    setStatus(color===WHITE?'Ваш ход':'ИИ думает...');
+  }
+}
+
+function showGameOver(title, desc) {
+  document.getElementById('go-title').textContent=title;
+  document.getElementById('go-desc').textContent=desc;
+  document.getElementById('gameover-overlay').style.display='flex';
+}
+
+function setStatus(txt) {
+  document.getElementById('status-text').textContent=txt;
+}
+
+function updateCapturedDisplay() {
+  const pieceSymbols={p:'♟',r:'♜',n:'♞',b:'♝',q:'♛',k:'♚'};
+  const wEl=document.getElementById('captured-white');
+  const bEl=document.getElementById('captured-black');
+  wEl.innerHTML=chessGame.engine.capturedByWhite.map(p=>`<span class="cap-piece">${pieceSymbols[p.type]}</span>`).join('');
+  bEl.innerHTML=chessGame.engine.capturedByBlack.map(p=>`<span class="cap-piece">${pieceSymbols[p.type]}</span>`).join('');
+}
+
+function getSerializableGameState() {
+  return {
+    board: chessGame.engine.board,
+    turn: chessGame.engine.turn,
+    castlingRights: chessGame.engine.castlingRights,
+    enPassantTarget: chessGame.engine.enPassantTarget,
+    moveHistory: chessGame.engine.moveHistory.map(move => ({ from: move.from, to: move.to })),
+    capturedByWhite: chessGame.engine.capturedByWhite,
+    capturedByBlack: chessGame.engine.capturedByBlack
+  };
+}
+
+function initHelperWorker() {
+  if(helperWorker) return helperWorker;
+  helperWorker = new Worker('helper-worker.js');
+  helperWorker.addEventListener('message', event => {
+    const data = event.data || {};
+    if(data.type!=='HELPER_RESPONSE') return;
+    const request = helperRequests.get(data.requestId);
+    if(!request) return;
+    helperRequests.delete(data.requestId);
+    if(data.payload && data.payload.error) request.reject(new Error(data.payload.error));
+    else request.resolve(data.payload || {});
+  });
+  helperWorker.addEventListener('error', error => {
+    helperRequests.forEach(request => request.reject(error));
+    helperRequests.clear();
+    helperWorker = null;
+    setAIModelLabel('local engine');
+  });
+  return helperWorker;
+}
+
+function requestHelper(action, extra={}) {
+  const worker = helperWorker || initHelperWorker();
+  if(!worker) {
+    return Promise.reject(new Error('helper_unavailable'));
+  }
+
+  const requestId = `helper-${++helperRequestSeq}`;
+  const bestMoveTimeout = extra.difficulty==='hard' ? 4500 : 1800;
+  const timeoutMs = action==='bestMove' ? bestMoveTimeout : 2500;
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      helperRequests.delete(requestId);
+      reject(new Error('helper_timeout'));
+    }, timeoutMs);
+
+    helperRequests.set(requestId, {
+      resolve: (payload) => {
+        clearTimeout(timeout);
+        resolve(payload);
+      },
+      reject: (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+
+    worker.postMessage({
+      type: 'HELPER_REQUEST',
+      requestId,
+      action,
+      state: getSerializableGameState(),
+      ...extra
+    });
+  });
+}
+
+function showTutorialPanel(text) {
+  document.getElementById('tutorial-text').textContent = text;
+  document.getElementById('tutorial-panel').classList.add('visible');
+}
+
+function dismissTutorialMessage() {
+  document.getElementById('tutorial-panel').classList.remove('visible');
+}
+
+function setTutorialConfirmVisible(visible) {
+  const btn = document.getElementById('tutorial-confirm-btn');
+  if(!btn) return;
+  btn.classList.toggle('hidden', !visible);
+}
+
+function resetTutorialConfirmState() {
+  if(tutorialStepResolver) {
+    const resolve = tutorialStepResolver;
+    tutorialStepResolver = null;
+    resolve();
+  }
+  tutorialStepResolver = null;
+  chessGame.tutorialAwaitingConfirm = false;
+  setTutorialConfirmVisible(false);
+}
+
+function waitForTutorialConfirm() {
+  chessGame.tutorialAwaitingConfirm = true;
+  setTutorialConfirmVisible(true);
+  return new Promise(resolve => {
+    tutorialStepResolver = resolve;
+  });
+}
+
+function confirmTutorialStep() {
+  if(!chessGame.trainingMatch || !chessGame.tutorialAwaitingConfirm || !tutorialStepResolver) return;
+  const resolve = tutorialStepResolver;
+  tutorialStepResolver = null;
+  chessGame.tutorialAwaitingConfirm = false;
+  setTutorialConfirmVisible(false);
+  resolve();
+}
+
+function clearTutorialHighlights() {
+  highlightObjects = highlightObjects.filter(obj => {
+    if(obj.userData && obj.userData.highlightType==='tutorial') {
+      boardGroup.remove(obj);
+      return false;
+    }
+    return true;
+  });
+}
+
+function addTutorialFocus(squares) {
+  clearTutorialHighlights();
+  squares.forEach(square => addHighlight(square.r, square.c, 0x7BE0FF, 0.42, 'tutorial'));
+}
+
+async function playTutorialIntro() {
+  tutorialSequenceToken += 1;
+  const token = tutorialSequenceToken;
+  chessGame.tutorialLocked = true;
+  try {
+    const hint = await requestHelper('tutorialHint');
+    const intro = hint.intro || [];
+    for(const step of intro) {
+      if(token!==tutorialSequenceToken || !chessGame.trainingMatch) return;
+      addTutorialFocus(step.squares || []);
+      showTutorialPanel(step.text);
+      await waitForTutorialConfirm();
+      await new Promise(resolve => setTimeout(resolve, 120));
+    }
+  } catch(e) {
+  } finally {
+    resetTutorialConfirmState();
+    clearTutorialHighlights();
+    chessGame.tutorialLocked = false;
+    if(chessGame.trainingMatch) requestTutorialHint();
+  }
+}
+
+async function requestTutorialHint(forceOpen=false) {
+  if(!chessGame.trainingMatch || chessGame.engine.turn!==WHITE) return;
+  try {
+    const hint = await requestHelper('tutorialHint');
+    chessGame.tutorialSuggestion = hint.move || null;
+    if(hint.move) {
+      addTutorialFocus([{r:hint.move.from.r,c:hint.move.from.c},{r:hint.move.to.r,c:hint.move.to.c}]);
+    }
+    if(forceOpen || hint.text) showTutorialPanel(hint.text || 'Сделайте спокойный развивающий ход.');
+  } catch(e) {
+    if(forceOpen) showTutorialPanel('Подсказка временно недоступна, но матч можно продолжать.');
+  }
+}
+
+function openTrainingTheory() {
+  localStorage.setItem(TUTORIAL_STORAGE_KEY, '1');
+  window.location.href='rules.html?mode=tutorial';
+}
+
+function showTutorialComplete() {
+  document.getElementById('tutorial-complete-overlay').style.display='flex';
+}
+
+function closeTutorialComplete() {
+  document.getElementById('tutorial-complete-overlay').style.display='none';
+}
+
+function startTrainingMatch() {
+  chessGame.trainingMatch = true;
+  chessGame.tutorialSuggestion = null;
+  chessGame.tutorialLocked = true;
+  chessGame.tutorialAwaitingConfirm = false;
+  chessGame.difficulty = 'easy';
+  document.querySelectorAll('.diff-btn').forEach(btn=>btn.classList.remove('active'));
+  document.getElementById('btn-easy').classList.add('active');
+  newGame();
+  showTutorialPanel('Сейчас быстро покажу, где на стартовой доске стоят фигуры, а потом буду подсказывать полезные ходы.');
+  setTimeout(()=>playTutorialIntro(), 250);
+}
+
+function endTrainingMatch(completed=false) {
+  tutorialSequenceToken += 1;
+  chessGame.trainingMatch = false;
+  chessGame.tutorialSuggestion = null;
+  chessGame.tutorialLocked = false;
+  resetTutorialConfirmState();
+  clearTutorialHighlights();
+  dismissTutorialMessage();
+  if(completed) showTutorialComplete();
+}
+
+function formatClock(ms) {
+  const safeMs = Math.max(0, Math.floor(ms));
+  const totalSeconds = Math.ceil(safeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+}
+
+function updateScoreDisplay() {
+  document.getElementById('player-score').textContent = chessGame.scores.player;
+  document.getElementById('ai-score').textContent = chessGame.scores.ai;
+}
+
+function updateTournamentDisplay() {
+  const isActive = chessGame.tournamentMode;
+  document.getElementById('tournament-toggle').checked = isActive;
+  document.getElementById('clock-white').textContent = formatClock(chessGame.clocks[WHITE]);
+  document.getElementById('clock-black').textContent = formatClock(chessGame.clocks[BLACK]);
+
+  const whiteBox = document.getElementById('clock-white-box');
+  const blackBox = document.getElementById('clock-black-box');
+  whiteBox.classList.toggle('active', isActive && chessGame.engine.turn===WHITE && !isGameOverFlag);
+  blackBox.classList.toggle('active', isActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
+  whiteBox.classList.toggle('tournament-off', !isActive);
+  blackBox.classList.toggle('tournament-off', !isActive);
+}
+
+function setChatHidden(hidden) {
+  chessGame.chatHidden = hidden;
+  document.body.classList.toggle('hidden-chat', hidden);
+  if(hidden) {
+    document.getElementById('chat-panel').classList.remove('collapsed', 'mobile-open');
+  }
+}
+
+function hideChatCompletely() {
+  setChatHidden(true);
+  saveGame();
+}
+
+function showHiddenChat() {
+  setChatHidden(false);
+  const panel = document.getElementById('chat-panel');
+  if(window.innerWidth <= 768) panel.classList.add('mobile-open');
+  else panel.classList.remove('collapsed');
+  saveGame();
+}
+
+function resetTournamentClocks() {
+  chessGame.clocks = { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS };
+  chessGame.lastClockTick = 0;
+  updateTournamentDisplay();
+}
+
+function stopTournamentClock() {
+  if(tournamentClockInterval) {
+    clearInterval(tournamentClockInterval);
+    tournamentClockInterval = null;
+  }
+  chessGame.lastClockTick = 0;
+}
+
+function saveClockSnapshot() {
+  const history = chessGame.engine.moveHistory;
+  if(history.length) history[history.length - 1].clockState = { ...chessGame.clocks };
+}
+
+function applyTournamentIncrement(color) {
+  if(!chessGame.tournamentMode) return;
+  chessGame.clocks[color] = Math.max(0, chessGame.clocks[color]) + TOURNAMENT_INCREMENT_MS;
+}
+
+function awardWin(color) {
+  if(color===WHITE) chessGame.scores.player += 1;
+  if(color===BLACK) chessGame.scores.ai += 1;
+  updateScoreDisplay();
+}
+
+function getRandomPromotion() {
+  return PROMOTION_TYPES[Math.floor(Math.random() * PROMOTION_TYPES.length)];
+}
+
+function executeTimedOutMove(color) {
+  const engine = chessGame.engine;
+  if(engine.turn !== color || isAnimating || isGameOverFlag) return;
+
+  const legalMoves = engine.getAllLegalMoves(color);
+  if(!legalMoves.length) {
+    checkGameState();
+    return;
+  }
+
+  const move = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+  selectedSquare = null;
+  legalMovesCache = [];
+  renderHighlights();
+
+  addChatMessage('system', color===WHITE
+    ? 'Время вышло: за вас выполнен случайный допустимый ход.'
+    : 'Время ИИ вышло: выполнен случайный допустимый ход.');
+
+  if(color===WHITE) {
+    executePlayerMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to, getRandomPromotion(), true);
+  } else {
+    performAIMove(move, { skipComment: true, skipDelayMessage: true, forcePromotion: getRandomPromotion() });
+  }
+}
+
+function tickTournamentClock() {
+  if(!chessGame.tournamentMode || isGameOverFlag || isAnimating) return;
+
+  const now = performance.now();
+  if(!chessGame.lastClockTick) {
+    chessGame.lastClockTick = now;
+    return;
+  }
+
+  const side = chessGame.engine.turn;
+  const elapsed = now - chessGame.lastClockTick;
+  chessGame.lastClockTick = now;
+  chessGame.clocks[side] = Math.max(0, chessGame.clocks[side] - elapsed);
+  updateTournamentDisplay();
+
+  if(chessGame.clocks[side] <= 0) {
+    stopTournamentClock();
+    executeTimedOutMove(side);
+  }
+}
+
+function syncTournamentClock() {
+  stopTournamentClock();
+  updateTournamentDisplay();
+  if(chessGame.tournamentMode && !isGameOverFlag && !isAnimating) {
+    chessGame.lastClockTick = performance.now();
+    tournamentClockInterval = setInterval(tickTournamentClock, 200);
+  }
+}
+
+function toggleTournamentMode(enabled) {
+  chessGame.tournamentMode = enabled;
+  if(enabled) resetTournamentClocks();
+  else stopTournamentClock();
+  selectedSquare = null;
+  legalMovesCache = [];
+  renderHighlights();
+  updateTournamentDisplay();
+  syncTournamentClock();
+  addChatMessage('system', enabled
+    ? 'Турнирный режим включён: подсветка ходов скрыта, часы запущены.'
+    : 'Турнирный режим отключён: подсветка ходов снова доступна.');
+  saveGame();
+}
+
+// ============================================================
+// AI CHAT (MISTRAL)
+// ============================================================
+const API_KEYS=['9GD4i61YFOjDaMCpcs9XF2clvlYRf7EZ','G9CuVLq1Sfw7BZr4kSBuCReNrHvQNsno'];
+let currentKeyIdx=0;
+const MISTRAL_TIMEOUT_MS = 1800;
+const MISTRAL_COOLDOWN_MS = 90000;
+const mistralState = { failStreak: 0, cooldownUntil: 0 };
+
+function setAIModelLabel(text) {
+  const el = document.getElementById('ai-model-label');
+  if(el) el.textContent = text;
+}
+
+function shouldUseMistral() {
+  if(!API_KEYS.length) return false;
+  if(Date.now() < mistralState.cooldownUntil) return false;
+  return true;
+}
+
+function buildLocalChessReply() {
+  const evalCp = evaluateBoard(chessGame.engine, true);
+  const sideText = evalCp < -120 ? 'У чёрных устойчивый перевес.' : evalCp > 120 ? 'Позиция сейчас больше в пользу белых.' : 'Позиция пока довольно ровная.';
+  const sideToMove = chessGame.engine.turn===WHITE ? 'Ход белых.' : 'Ход чёрных.';
+  return `${sideText} ${sideToMove}`;
+}
+
+function cleanMarkdown(text) {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g,'$1')
+    .replace(/\*([^*]+)\*/g,'$1')
+    .replace(/#{1,6}\s/g,'')
+    .replace(/`([^`]+)`/g,'$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g,'$1')
+    .replace(/^\s*[-*+]\s/gm,'• ')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
+
+async function callMistral(messages, retries=0) {
+  if(!shouldUseMistral()) return null;
+  const key=API_KEYS[currentKeyIdx];
+  let timeoutId = null;
+  try {
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => controller.abort(), MISTRAL_TIMEOUT_MS);
+    const res=await fetch('https://api.mistral.ai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+      body:JSON.stringify({model:'mistral-tiny',messages,max_tokens:200,temperature:0.7}),
+      signal: controller.signal
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    mistralState.failStreak = 0;
+    mistralState.cooldownUntil = 0;
+    setAIModelLabel('local engine + mistral');
+    return cleanMarkdown(data.choices[0]?.message?.content || '');
+  } catch(e) {
+    mistralState.failStreak += 1;
+    if(mistralState.failStreak >= 2) {
+      mistralState.cooldownUntil = Date.now() + MISTRAL_COOLDOWN_MS;
+      setAIModelLabel('local engine');
+    }
+    if(retries<1){currentKeyIdx=(currentKeyIdx+1)%API_KEYS.length;return callMistral(messages,retries+1);}
+    return null;
+  } finally {
+    if(timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+function getSystemPrompt() {
+  const prompts={
+    easy:'Ты дружелюбный шахматный помощник. Комментируй ходы просто и понятно, в 1-2 предложениях. Только по-русски.',
+    medium:'Ты опытный шахматист. Кратко комментируй стратегию, в 2-3 предложениях. Только по-русски.',
+    hard:'Ты гроссмейстер. Анализируй позицию глубже, отмечай угрозы и планы, в 3-4 предложениях. Только по-русски.'
+  };
+  return prompts[chessGame.difficulty]||prompts.medium;
+}
+
+const PIECE_NAMES={p:'пешку',r:'ладью',n:'коня',b:'слона',q:'ферзя',k:'короля'};
+const COL_NAMES=['a','b','c','d','e','f','g','h'];
+const ROW_NAMES=['8','7','6','5','4','3','2','1'];
+
+function moveToAlgebraic(move, piece) {
+  const from=`${COL_NAMES[move.from.c]}${ROW_NAMES[move.from.r]}`;
+  const to=`${COL_NAMES[move.to.c]}${ROW_NAMES[move.to.r]}`;
+  return `${PIECE_NAMES[piece.type]} с ${from} на ${to}`;
+}
+
+async function getAIComment(move, piece) {
+  const desc=moveToAlgebraic(move,piece);
+  const fen=chessGame.engine.getBoardFEN();
+  const thinkId=addThinkingMessage();
+  const msgs=[
+    {role:'system',content:getSystemPrompt()},
+    {role:'user',content:`Я сделал ход: ${desc}. FEN позиции: ${fen}. Прокомментируй кратко.`}
+  ];
+  const reply=await callMistral(msgs);
+  removeThinkingMessage(thinkId);
+  if(reply) addChatMessage('ai',reply);
+  else addChatMessage('ai',buildLocalChessReply());
+}
+
+async function sendChatMessage() {
+  const inp=document.getElementById('chat-input');
+  if(!inp) return;
+  const text=inp.value.trim();
+  if(!text) return;
+  inp.value='';
+  addChatMessage('user',text);
+  const thinkId=addThinkingMessage();
+  const fen=chessGame.engine.getBoardFEN();
+  const msgs=[
+    {role:'system',content:getSystemPrompt()+' Ты также отвечаешь на вопросы о текущей партии.'},
+    {role:'user',content:`Позиция (FEN): ${fen}. Вопрос: ${text}`}
+  ];
+  const reply=await callMistral(msgs);
+  removeThinkingMessage(thinkId);
+  if(reply) addChatMessage('ai',reply);
+  else addChatMessage('ai','Сеть с языковой моделью сейчас недоступна. Я продолжаю играть локально и могу подсказать базовый план: развивайте фигуры, боритесь за центр и берегите короля.');
+}
+
+let thinkingCounter=0;
+function addThinkingMessage() {
+  const id='think-'+thinkingCounter++;
+  const el=document.createElement('div');
+  el.className='chat-msg ai'; el.id=id;
+  el.innerHTML=`<div class="msg-label">ИИ думает</div><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollChat(); return id;
+}
+function removeThinkingMessage(id) {
+  const el=document.getElementById(id);
+  if(el) el.remove();
+}
+function addChatMessage(type, text) {
+  const el=document.createElement('div');
+  el.className=`chat-msg ${type}`;
+  if(type==='ai') el.innerHTML=`<div class="msg-label">ИИ-соперник</div>${text}`;
+  else if(type==='user') el.innerHTML=`<div class="msg-label" style="color:#888">Вы</div>${text}`;
+  else el.textContent=text;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollChat();
+  saveGame();
+}
+function scrollChat() {
+  const m=document.getElementById('chat-messages');
+  m.scrollTop=m.scrollHeight;
+}
+
+// ============================================================
+// GAME CONTROLS
+// ============================================================
+function setDifficulty(d) {
+  if(chessGame.trainingMatch && d!=='easy') {
+    addChatMessage('system','В обучающем матче сложность зафиксирована на лёгком режиме.');
+    return;
+  }
+  chessGame.difficulty=d;
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`btn-${d}`).classList.add('active');
+  saveGame();
+  addChatMessage('system',`Сложность изменена: ${d==='easy'?'Лёгкая':d==='medium'?'Стандарт':'Сложная'}`);
+}
+
+function undoMove() {
+  if(isAnimating||isGameOverFlag) return;
+  const engine=chessGame.engine;
+  // Undo AI move and player move
+  let h=engine.undoMove();
+  if(!h) return;
+  if(engine.turn===BLACK) engine.undoMove();
+  lastMoveHighlights=[];
+  selectedSquare=null; legalMovesCache=[];
+  renderBoard();
+  setStatus('Ваш ход');
+  saveGame();
+  addChatMessage('system','Ход отменён');
+}
+
+function newGame() {
+  isGameOverFlag=false;
+  chessGame.engine.reset();
+  selectedSquare=null; legalMovesCache=[];
+  lastMoveHighlights=[];
+  document.getElementById('gameover-overlay').style.display='none';
+  renderBoard();
+  setStatus('Ваш ход');
+  document.getElementById('chat-messages').innerHTML='';
+  addChatMessage('system','Новая партия начата. Удачи!');
+  saveGame();
+}
+
+function resignGame() {
+  if(isGameOverFlag) return;
+  isGameOverFlag=true;
+  showGameOver('ВЫ СДАЛИСЬ','Чёрные победили!');
+  addChatMessage('system','Вы сдались. Чёрные победили!');
+  saveGame();
+}
+
+function goToRules() {
+  localStorage.setItem(TUTORIAL_STORAGE_KEY, '1');
+  window.location.href='rules.html?mode=tutorial';
+}
+
+function startGame() {
+  document.getElementById('popup-overlay').style.display='none';
+  if(chessGame.pendingTrainingStart) {
+    chessGame.pendingTrainingStart = false;
+    startTrainingMatch();
+    return;
+  }
+  chessGame.trainingMatch = false;
+  if(chessGame.pendingTrainingStart) {
+    chessGame.pendingTrainingStart = false;
+    startTrainingMatch();
+    return;
+  }
+  chessGame.trainingMatch = false;
+  if(chessGame.pendingTrainingStart) {
+    chessGame.pendingTrainingStart = false;
+    startTrainingMatch();
+    return;
+  }
+  chessGame.trainingMatch = false;
+  addChatMessage('system','Добро пожаловать! Вы играете белыми. Ваш ход!');
+}
+
+function selectPromotion(type) {
+  document.getElementById('promo-overlay').style.display='none';
+  if(pendingPromotion) {
+    const {fr,fc,tr,tc,move}=pendingPromotion;
+    executePlayerMove(fr,fc,tr,tc,move,type);
+    pendingPromotion=null;
+  }
+}
+
+function toggleChat() {
+  const panel=document.getElementById('chat-panel');
+  const isMobile=window.innerWidth<=768;
+  if(isMobile) { panel.classList.toggle('mobile-open'); }
+  else { panel.classList.toggle('collapsed'); }
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+function saveGame() {
+  try {
+    const chatMsgs=Array.from(document.querySelectorAll('.chat-msg')).map(el=>({
+      type:[...el.classList].find(c=>c!=='chat-msg'), html:el.innerHTML
+    }));
+    const state={
+      board:chessGame.engine.board,
+      turn:chessGame.engine.turn,
+      cr:chessGame.engine.castlingRights,
+      ep:chessGame.engine.enPassantTarget,
+      difficulty:chessGame.difficulty,
+      history:chessGame.engine.moveHistory,
+      capturedByWhite:chessGame.engine.capturedByWhite,
+      capturedByBlack:chessGame.engine.capturedByBlack,
+      chat:chatMsgs
+    };
+    localStorage.setItem('chess_save',JSON.stringify(state));
+  } catch(e) {}
+}
+
+function loadGame() {
+  try {
+    const raw=localStorage.getItem('chess_save');
+    if(!raw) return false;
+    const s=JSON.parse(raw);
+    chessGame.engine.board=s.board;
+    chessGame.engine.turn=s.turn;
+    chessGame.engine.castlingRights=s.cr;
+    chessGame.engine.enPassantTarget=s.ep;
+    chessGame.engine.moveHistory=s.history||[];
+    chessGame.engine.capturedByWhite=s.capturedByWhite||[];
+    chessGame.engine.capturedByBlack=s.capturedByBlack||[];
+    chessGame.difficulty=s.difficulty||'medium';
+    // Restore chat
+    if(s.chat&&s.chat.length) {
+      const chatEl=document.getElementById('chat-messages');
+      chatEl.innerHTML='';
+      s.chat.forEach(m=>{ const el=document.createElement('div'); el.className=`chat-msg ${m.type}`; el.innerHTML=m.html; chatEl.appendChild(el); });
+      scrollChat();
+    }
+    return true;
+  } catch(e) { return false; }
+}
+
+// ============================================================
+// ENHANCED UX OVERRIDES
+// ============================================================
+function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
+  isAnimating = true;
+  stopTournamentClock();
+
+  const engine = chessGame.engine;
+  const fromMesh = pieceObjects[`${fr},${fc}`];
+  const targetPos = squareToWorld(tr,tc);
+
+  if(move && move.enPassant) {
+    const movingPiece = engine.getPiece(fr,fc);
+    if(movingPiece) {
+      const capRow = movingPiece.color===WHITE ? tr+1 : tr-1;
+      const epKey = `${capRow},${tc}`;
+      if(pieceObjects[epKey]) {
+        flashAndRemove(pieceObjects[epKey]);
+        delete pieceObjects[epKey];
+      }
+    }
+  }
+
+  const finalizeMove = () => {
+    const clockBeforeMove = { ...chessGame.clocks };
+    engine.makeMove(fr,fc,tr,tc,move,promo);
+    if(chessGame.tournamentMode) {
+      chessGame.clocks = clockBeforeMove;
+      saveClockSnapshot();
+      applyTournamentIncrement(WHITE);
+    }
+    lastMoveHighlights = [{r:fr,c:fc},{r:tr,c:tc}];
+    renderBoard();
+    saveGame();
+    isAnimating = false;
+    checkGameState();
+    syncTournamentClock();
+    if(chessGame.trainingMatch) clearTutorialHighlights();
+    if(engine.turn===BLACK && !isGameOver()) {
+      setTimeout(()=>doAIMove(), isTimedOut ? 80 : 200);
+    }
+  };
+
+  if(fromMesh) {
+    const capKey = `${tr},${tc}`;
+    if(pieceObjects[capKey] && capKey !== `${fr},${fc}`) {
+      flashAndRemove(pieceObjects[capKey]);
+      delete pieceObjects[capKey];
+    }
+    animatePiece(fromMesh, targetPos, 420, finalizeMove);
+  } else {
+    finalizeMove();
+  }
+}
+
+async function doAIMove() {
+  if(isGameOverFlag) return;
+  setStatus('ИИ думает...');
+  const waitMs = chessGame.difficulty==='hard' ? 220 : 140;
+  await new Promise(r=>setTimeout(r,waitMs));
+  try {
+    const response = await requestHelper('bestMove', { difficulty: chessGame.trainingMatch ? 'easy' : chessGame.difficulty });
+    const best = response.move;
+    if(!best) { checkGameState(); return; }
+    performAIMove(best);
+  } catch(e) {
+    const fallback = getBestMoveByDifficulty(chessGame.engine, chessGame.trainingMatch ? 'easy' : chessGame.difficulty);
+    if(!fallback) { checkGameState(); return; }
+    performAIMove(fallback);
+  }
+}
+
+function checkGameState() {
+  const engine = chessGame.engine;
+  const color = engine.turn;
+
+  if(engine.isCheckmate(color)) {
+    isGameOverFlag = true;
+    stopTournamentClock();
+    const winnerColor = color===WHITE ? BLACK : WHITE;
+    const winner = winnerColor===WHITE ? 'Белые' : 'Чёрные';
+    awardWin(winnerColor);
+    showGameOver('ШАХ И МАТ!', `${winner} победили!`);
+    addChatMessage('system',`Игра завершена: ${winner} победили!`);
+    if(chessGame.trainingMatch) endTrainingMatch(true);
+    saveGame();
+  } else if(engine.isStalemate(color)) {
+    isGameOverFlag = true;
+    stopTournamentClock();
+    showGameOver('ПАТ!','Ничья — у вас нет доступных ходов');
+    addChatMessage('system','Ничья — пат!');
+    if(chessGame.trainingMatch) endTrainingMatch(true);
+    saveGame();
+  } else if(engine.isInsufficientMaterial()) {
+    isGameOverFlag = true;
+    stopTournamentClock();
+    showGameOver('НИЧЬЯ','Недостаточно фигур для мата');
+    addChatMessage('system','Ничья — недостаточно фигур для мата.');
+    if(chessGame.trainingMatch) endTrainingMatch(true);
+    saveGame();
+  } else if(engine.isInCheck(color)) {
+    setStatus(color===WHITE ? 'Шах вам!' : 'Шах чёрному королю!');
+    addChatMessage('system',color===WHITE ? 'Вашему королю объявлен шах!' : 'Шах чёрному королю!');
+  } else {
+    setStatus(color===WHITE ? 'Ваш ход' : 'ИИ думает...');
+  }
+
+  updateTournamentDisplay();
+  updateScoreDisplay();
+}
+
+function toggleChat() {
+  if(chessGame.chatHidden) {
+    showHiddenChat();
+    return;
+  }
+  const panel = document.getElementById('chat-panel');
+  const isMobile = window.innerWidth<=768;
+  if(isMobile) panel.classList.toggle('mobile-open');
+  else panel.classList.toggle('collapsed');
+  saveGame();
+}
+
+function saveGame() {
+  try {
+    const chatMsgs = Array.from(document.querySelectorAll('.chat-msg')).map(el=>({
+      type:[...el.classList].find(c=>c!=='chat-msg'),
+      html:el.innerHTML
+    }));
+    const state = {
+      board: chessGame.engine.board,
+      turn: chessGame.engine.turn,
+      cr: chessGame.engine.castlingRights,
+      ep: chessGame.engine.enPassantTarget,
+      difficulty: chessGame.difficulty,
+      history: chessGame.engine.moveHistory,
+      capturedByWhite: chessGame.engine.capturedByWhite,
+      capturedByBlack: chessGame.engine.capturedByBlack,
+      chat: chatMsgs,
+      tournamentMode: chessGame.tournamentMode,
+      clocks: chessGame.clocks,
+      scores: chessGame.scores,
+      chatHidden: chessGame.chatHidden,
+      trainingMatch: chessGame.trainingMatch
+    };
+    localStorage.setItem('chess_save',JSON.stringify(state));
+  } catch(e) {}
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem('chess_save');
+    if(!raw) return false;
+    const s = JSON.parse(raw);
+    chessGame.engine.board = s.board;
+    chessGame.engine.turn = s.turn;
+    chessGame.engine.castlingRights = s.cr;
+    chessGame.engine.enPassantTarget = s.ep;
+    chessGame.engine.moveHistory = s.history || [];
+    chessGame.engine.capturedByWhite = s.capturedByWhite || [];
+    chessGame.engine.capturedByBlack = s.capturedByBlack || [];
+    chessGame.difficulty = s.difficulty || 'medium';
+    chessGame.tournamentMode = !!s.tournamentMode;
+    chessGame.clocks = s.clocks || { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS };
+    chessGame.scores = s.scores || { player:0, ai:0 };
+    chessGame.trainingMatch = !!s.trainingMatch;
+    setChatHidden(!!s.chatHidden);
+
+    const chatEl = document.getElementById('chat-messages');
+    chatEl.innerHTML = '';
+    if(s.chat && s.chat.length) {
+      s.chat.forEach(m=>{
+        const el=document.createElement('div');
+        el.className=`chat-msg ${m.type}`;
+        el.innerHTML=m.html;
+        chatEl.appendChild(el);
+      });
+      scrollChat();
+    }
+
+    updateScoreDisplay();
+    updateTournamentDisplay();
+    if(chessGame.trainingMatch) showTutorialPanel('Обучающий матч восстановлен. Сейчас подскажу следующий полезный ход.');
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+function undoMove() {
+  if(isAnimating || isGameOverFlag) return;
+  const engine = chessGame.engine;
+  const h = engine.undoMove();
+  if(!h) return;
+  if(engine.turn===BLACK) engine.undoMove();
+
+  const lastHistory = engine.moveHistory[engine.moveHistory.length - 1];
+  chessGame.clocks = lastHistory && lastHistory.clockState
+    ? { ...lastHistory.clockState }
+    : { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS };
+
+  lastMoveHighlights = [];
+  selectedSquare = null;
+  legalMovesCache = [];
+  renderBoard();
+  setStatus('Ваш ход');
+  isGameOverFlag = false;
+  document.getElementById('gameover-overlay').style.display='none';
+  syncTournamentClock();
+  saveGame();
+  if(chessGame.trainingMatch && chessGame.engine.turn===WHITE) requestTutorialHint(true);
+  addChatMessage('system','Ход отменён');
+}
+
+function newGame() {
+  isGameOverFlag = false;
+  stopTournamentClock();
+  chessGame.engine.reset();
+  selectedSquare = null;
+  legalMovesCache = [];
+  lastMoveHighlights = [];
+  document.getElementById('gameover-overlay').style.display='none';
+  closeTutorialComplete();
+  resetTournamentClocks();
+  renderBoard();
+  setStatus('Ваш ход');
+  document.getElementById('chat-messages').innerHTML = '';
+  addChatMessage('system','Новая партия начата. Удачи!');
+  updateScoreDisplay();
+  updateTournamentDisplay();
+  syncTournamentClock();
+  if(chessGame.trainingMatch) requestTutorialHint(true);
+  saveGame();
+}
+
+function resignGame() {
+  if(isGameOverFlag) return;
+  const wasTraining = chessGame.trainingMatch;
+  isGameOverFlag = true;
+  stopTournamentClock();
+  if(wasTraining) endTrainingMatch(false);
+  awardWin(BLACK);
+  showGameOver('ВЫ СДАЛИСЬ','Чёрные победили!');
+  addChatMessage('system','Вы сдались. Чёрные победили!');
+  saveGame();
+}
+
+function startGame() {
+  document.getElementById('popup-overlay').style.display='none';
+  if(chessGame.pendingTrainingStart) {
+    chessGame.pendingTrainingStart = false;
+    startTrainingMatch();
+    return;
+  }
+  chessGame.trainingMatch = false;
+  addChatMessage('system','Добро пожаловать! Вы играете белыми. Ваш ход!');
+  syncTournamentClock();
+}
+
+// ============================================================
+// RENDER LOOP
+// ============================================================
+let time=0;
+function animate() {
+  requestAnimationFrame(animate);
+  time+=0.016;
+  // Gentle board float
+  if(boardGroup) boardGroup.position.y=Math.sin(time*0.3)*0.03;
+  // Animate selected piece hover
+  if(selectedSquare) {
+    const key=`${selectedSquare.r},${selectedSquare.c}`;
+    const mesh=pieceObjects[key];
+    if(mesh) {
+      mesh.position.y=0.08+Math.abs(Math.sin(time*3))*0.2;
+      mesh.rotation.y=time*1.5;
+      if(mesh.material) {
+        mesh.material.emissiveIntensity=0.3+Math.sin(time*4)*0.1;
+      }
+    }
+  }
+  // Animate highlight rings
+  highlightObjects.forEach((h,i)=>{
+    if(h.userData.highlightType==='legal') {
+      h.material.opacity=0.5+Math.sin(time*3+i)*0.3;
+    }
+    if(h.userData.highlightType==='selected') {
+      h.material.opacity=0.5+Math.sin(time*4)*0.2;
+    }
+    if(h.userData.highlightType==='tutorial') {
+      h.material.opacity = 0.34 + Math.sin(time * 4.6 + i) * 0.2;
+      const baseScale = 1.0 + Math.sin(time * 3.7 + i) * 0.06;
+      h.scale.set(baseScale, baseScale, 1);
+    }
+  });
+  // Rotate particles slowly
+  scene.children.forEach(c=>{ if(c.userData.isParticles) c.rotation.y=time*0.05; });
+  renderer.render(scene,camera);
+}
+
+function onResize() {
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  applyResponsiveCameraPreset();
+}
+
+// ============================================================
+// MAIN GAME OBJECT
+// ============================================================
+const chessGame = {
+  engine: new ChessEngine(),
+  difficulty: 'medium',
+  tournamentMode: false,
+  chatHidden: false,
+  clocks: { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS },
+  scores: { player: 0, ai: 0 },
+  lastClockTick: 0,
+  trainingMatch: false,
+  tutorialSuggestion: null,
+  tutorialLocked: false,
+  tutorialAwaitingConfirm: false,
+  pendingTrainingStart: false
+};
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Prevent context menu
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  initHelperWorker();
+
+  initThree();
+  applyResponsiveCameraPreset(true);
+  updateScoreDisplay();
+  resetTournamentClocks();
+  updateTournamentDisplay();
+  setChatHidden(false);
+  setAIModelLabel(shouldUseMistral() ? 'local engine + mistral' : 'local engine');
+  const searchParams = new URLSearchParams(window.location.search);
+  const wantsTutorial = searchParams.get('tutorial')==='1' || searchParams.get('mode')==='tutorial' || localStorage.getItem(TUTORIAL_STORAGE_KEY)==='1';
+  if(wantsTutorial) {
+    chessGame.pendingTrainingStart = true;
+    localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+  }
+
+  setTimeout(()=>{
+    const saved=loadGame();
+    if(saved) {
+      // Update difficulty buttons
+      document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+      document.getElementById(`btn-${chessGame.difficulty}`).classList.add('active');
+      renderBoard();
+      updateScoreDisplay();
+      updateTournamentDisplay();
+      setStatus(chessGame.engine.turn===WHITE?'Ваш ход':'ИИ думает...');
+      syncTournamentClock();
+      if(chessGame.trainingMatch && chessGame.engine.turn===WHITE) requestTutorialHint(true);
+      if(chessGame.engine.turn===BLACK) doAIMove();
+    } else {
+      renderBoard();
+      updateScoreDisplay();
+      updateTournamentDisplay();
+      if(chessGame.pendingTrainingStart) startGame();
+      else document.getElementById('popup-overlay').style.display='flex';
+    }
+    // Hide loading
+    const loading=document.getElementById('loading');
+    loading.style.opacity='0';
+    setTimeout(()=>loading.style.display='none',500);
+  }, 1200);
+
+  window.addEventListener('resize', ()=>{
+    updateTournamentDisplay();
+    if(chessGame.chatHidden) return;
+    if(window.innerWidth > 768) {
+      document.getElementById('chat-panel').classList.remove('mobile-open');
+    }
+  });
+});
+</script>
+</body>
+</html>
+

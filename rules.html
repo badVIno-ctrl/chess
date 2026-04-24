@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Правила шахмат — Viora Studio</title>
+<style>
+  :root {
+    --gold: #D4AF37;
+    --gold-light: #F0D060;
+    --gold-dark: #A0820A;
+    --gold-dim: rgba(212,175,55,0.15);
+    --black: #070707;
+    --dark: #0F0F0F;
+    --dark2: #181818;
+    --dark3: #222222;
+    --silver: #C0C0C0;
+    --text: #DDDDDD;
+    --text-dim: #888888;
+  }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Georgia', Arial, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--dark); }
+  ::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 3px; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 30%, rgba(212,175,55,0.12) 0%, transparent 60%),
+                linear-gradient(180deg, #0A0A0A 0%, #050505 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 60px 20px;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content:''; position:absolute; inset:0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent, transparent 60px,
+      rgba(212,175,55,0.015) 60px, rgba(212,175,55,0.015) 61px
+    );
+  }
+  .hero-crown { font-size: 5rem; margin-bottom: 20px; filter: drop-shadow(0 0 30px rgba(212,175,55,0.6)); animation: crownFloat 3s ease-in-out infinite; }
+  @keyframes crownFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+  .hero h1 { font-size: clamp(2.5rem, 7vw, 5rem); color: var(--gold); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 16px; text-shadow: 0 0 40px rgba(212,175,55,0.4); font-weight: 900; }
+  .hero-sub { font-size: clamp(1rem, 2.5vw, 1.3rem); color: var(--text-dim); letter-spacing: 2px; margin-bottom: 50px; }
+  .hero-divider { width: 120px; height: 2px; background: linear-gradient(90deg,transparent,var(--gold),transparent); margin: 0 auto 50px; }
+  .hero-desc { max-width: 700px; font-size: 1.05rem; color: #AAA; line-height: 1.9; }
+
+  /* NAV */
+  .sticky-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(7,7,7,0.95); backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(212,175,55,0.2);
+    padding: 12px 30px;
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+  }
+  .nav-link {
+    color: var(--gold); text-decoration: none; font-size: 0.78rem;
+    letter-spacing: 1px; padding: 6px 14px; border-radius: 4px;
+    border: 1px solid transparent; transition: all 0.2s;
+    font-weight: 600;
+  }
+  .nav-link:hover { border-color: var(--gold-dark); background: var(--gold-dim); }
+
+  /* SECTIONS */
+  section { padding: 80px 20px; max-width: 1100px; margin: 0 auto; }
+  .section-title {
+    text-align: center; font-size: clamp(1.8rem, 4vw, 2.8rem);
+    color: var(--gold); letter-spacing: 3px; text-transform: uppercase;
+    margin-bottom: 12px; font-weight: 800;
+  }
+  .section-sub { text-align: center; color: var(--text-dim); margin-bottom: 50px; font-size: 0.95rem; letter-spacing: 1px; }
+  .gold-line { width: 80px; height: 2px; background: linear-gradient(90deg,transparent,var(--gold),transparent); margin: 0 auto 50px; }
+
+  /* CARDS */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .card {
+    background: var(--dark2);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 12px; padding: 28px;
+    transition: all 0.3s; position: relative; overflow: hidden;
+  }
+  .card::before { content:''; position:absolute; top:0;left:0;right:0;height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); opacity:0; transition:opacity 0.3s; }
+  .card:hover { border-color: rgba(212,175,55,0.5); transform: translateY(-4px); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+  .card:hover::before { opacity:1; }
+  .card-icon { font-size: 2.8rem; margin-bottom: 16px; display: block; }
+  .card h3 { color: var(--gold); font-size: 1.2rem; margin-bottom: 10px; letter-spacing: 1px; }
+  .card p { color: #AAA; font-size: 0.88rem; line-height: 1.7; }
+  .card .value-badge {
+    display: inline-block; background: var(--gold); color: #000;
+    font-size: 0.72rem; font-weight: 800; padding: 3px 10px;
+    border-radius: 20px; margin-top: 12px; letter-spacing: 1px;
+  }
+
+  /* PIECE MOVES - CSS CHESS GRIDS */
+  .moves-section { margin-bottom: 60px; }
+  .piece-block {
+    background: var(--dark2); border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 16px; padding: 32px; margin-bottom: 30px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center;
+  }
+  @media(max-width:650px){ .piece-block { grid-template-columns:1fr; } }
+  .piece-info h3 { color: var(--gold); font-size: 1.5rem; margin-bottom: 8px; letter-spacing: 2px; }
+  .piece-info .piece-symbol { font-size: 4rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(212,175,55,0.4)); }
+  .piece-info p { color: #AAA; font-size: 0.9rem; line-height: 1.8; }
+  .piece-info .tags { display: flex; flex-wrap:wrap; gap: 6px; margin-top: 12px; }
+  .tag { background: var(--gold-dim); border: 1px solid var(--gold-dark); color: var(--gold); font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; }
+
+  /* MINI CHESSBOARD */
+  .mini-board {
+    display: grid; grid-template-columns: repeat(8,1fr);
+    width: 100%; max-width: 280px; aspect-ratio: 1;
+    border: 2px solid var(--gold-dark);
+    border-radius: 4px; overflow: hidden;
+    margin: 0 auto;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  }
+  .mini-cell {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: clamp(0.6rem, 2.5vw, 1rem); position: relative;
+    transition: all 0.3s;
+  }
+  .mini-cell.light { background: #3D2B00; }
+  .mini-cell.dark { background: #1A1A1A; }
+  .mini-cell.can-move { background: rgba(212,175,55,0.35) !important; }
+  .mini-cell.can-capture { background: rgba(220,50,30,0.4) !important; }
+  .mini-cell.piece-here { z-index:2; }
+  .mini-cell .piece-glyph { font-size: clamp(0.9rem, 3vw, 1.4rem); filter: drop-shadow(0 0 4px rgba(212,175,55,0.8)); }
+  .mini-cell .dot {
+    width: 35%; height: 35%; border-radius: 50%;
+    background: rgba(212,175,55,0.7);
+    box-shadow: 0 0 8px rgba(212,175,55,0.5);
+  }
+  .mini-cell .ring {
+    width: 80%; height: 80%; border-radius: 50%;
+    border: 2px solid rgba(220,50,30,0.8);
+  }
+
+  /* SPECIAL RULES */
+  .special-card {
+    background: var(--dark2); border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 14px; padding: 30px; margin-bottom: 24px;
+  }
+  .special-card h3 { color: var(--gold); font-size: 1.2rem; margin-bottom: 16px; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+  .special-card p { color: #AAA; font-size: 0.9rem; line-height: 1.8; margin-bottom: 12px; }
+  .special-card .highlight-box {
+    background: rgba(212,175,55,0.06); border-left: 3px solid var(--gold);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 12px;
+    color: #CCC; font-size: 0.85rem;
+  }
+
+  /* CASTLING VISUAL */
+  .castling-vis {
+    display: flex; gap: 12px; align-items: center;
+    justify-content: center; margin: 20px 0; flex-wrap: wrap;
+  }
+  .castle-board {
+    display: grid; grid-template-columns: repeat(8, 32px);
+    gap: 1px; background: var(--gold-dark);
+    border: 1px solid var(--gold-dark); border-radius: 4px; overflow: hidden;
+  }
+  .cb-cell {
+    width: 32px; height: 32px; display: flex; align-items: center;
+    justify-content: center; font-size: 1rem;
+  }
+  .cb-cell.l { background: #3D2B00; }
+  .cb-cell.d { background: #1A1A1A; }
+  .cb-cell.hl { background: rgba(212,175,55,0.4); }
+  .cb-cell.mv { background: rgba(100,200,100,0.3); }
+  .arrow { color: var(--gold); font-size: 1.5rem; }
+
+  /* CHECK/CHECKMATE */
+  .check-box {
+    background: linear-gradient(135deg, rgba(139,0,0,0.15), rgba(20,20,20,0.95));
+    border: 1px solid rgba(200,0,0,0.3); border-radius: 14px;
+    padding: 28px; margin-bottom: 20px;
+  }
+  .check-box.stale { background: linear-gradient(135deg, rgba(100,100,100,0.15), rgba(20,20,20,0.95)); border-color: rgba(150,150,150,0.3); }
+  .check-box h3 { color: #FF6B6B; font-size: 1.2rem; margin-bottom: 12px; letter-spacing: 2px; }
+  .check-box.stale h3 { color: var(--silver); }
+  .check-box p { color: #AAA; font-size: 0.9rem; line-height: 1.8; }
+
+  /* TIPS */
+  .tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 30px; }
+  .tip-card {
+    background: var(--dark2); border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 10px; padding: 20px; transition: all 0.2s;
+  }
+  .tip-card:hover { border-color: var(--gold-dark); background: var(--dark3); }
+  .tip-num { color: var(--gold); font-size: 2rem; font-weight: 900; margin-bottom: 8px; }
+  .tip-card h4 { color: #EEE; font-size: 0.95rem; margin-bottom: 6px; }
+  .tip-card p { color: #888; font-size: 0.82rem; line-height: 1.6; }
+
+  /* VALUE TABLE */
+  .value-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  .value-table th { background: rgba(212,175,55,0.15); color: var(--gold); padding: 12px 16px; text-align: left; font-size: 0.85rem; letter-spacing: 1px; border-bottom: 1px solid rgba(212,175,55,0.3); }
+  .value-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.88rem; color: #CCC; }
+  .value-table tr:hover td { background: rgba(212,175,55,0.03); }
+  .piece-sym-cell { font-size: 1.6rem; }
+
+  /* CTA */
+  .cta-section {
+    text-align: center; padding: 100px 20px;
+    background: radial-gradient(ellipse at 50% 50%, rgba(212,175,55,0.1) 0%, transparent 60%);
+    position: relative;
+  }
+  .cta-title { font-size: clamp(2rem, 5vw, 3.5rem); color: var(--gold); font-weight: 900; letter-spacing: 4px; margin-bottom: 20px; text-shadow: 0 0 50px rgba(212,175,55,0.5); }
+  .cta-sub { color: #888; font-size: 1rem; margin-bottom: 50px; }
+  .cta-btn {
+    display: inline-block; background: linear-gradient(135deg, #D4AF37, #A0820A, #D4AF37);
+    background-size: 200% auto;
+    color: #000; font-size: 1.2rem; font-weight: 900;
+    padding: 20px 60px; border-radius: 8px; border: none;
+    cursor: pointer; letter-spacing: 3px; text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.3s; box-shadow: 0 0 40px rgba(212,175,55,0.4);
+    animation: btnShimmer 3s infinite;
+  }
+  @keyframes btnShimmer { 0%{background-position:0%} 50%{background-position:100%} 100%{background-position:0%} }
+  .cta-btn:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 10px 60px rgba(212,175,55,0.7); }
+
+  /* VIORA */
+  #viora-btn {
+    position: fixed; left: 20px; bottom: 20px; z-index: 200;
+    background: rgba(8,8,8,0.9); border: 1px solid rgba(212,175,55,0.4);
+    color: var(--gold); padding: 6px 14px; border-radius: 5px;
+    cursor: pointer; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    text-decoration: none; backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+  #viora-btn:hover { border-color: var(--gold); box-shadow: 0 0 15px rgba(212,175,55,0.3); }
+
+  /* BACK BTN */
+  .back-btn {
+    position: fixed; right: 20px; bottom: 20px; z-index: 200;
+    background: rgba(212,175,55,0.15); border: 1px solid var(--gold-dark);
+    color: var(--gold); padding: 8px 18px; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem; font-weight: 700;
+    letter-spacing: 1px; text-decoration: none;
+    backdrop-filter: blur(10px); transition: all 0.2s;
+  }
+  .back-btn:hover { background: rgba(212,175,55,0.25); }
+
+  /* PROGRESS */
+  .progress-bar {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+    z-index: 1000; transition: width 0.1s;
+  }
+
+  /* SEPARATOR */
+  .sep { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, rgba(212,175,55,0.2), transparent); margin: 20px 0; }
+
+  /* QUOTE */
+  .quote {
+    background: rgba(212,175,55,0.04); border-left: 4px solid var(--gold);
+    padding: 20px 28px; border-radius: 0 10px 10px 0; margin: 30px 0;
+    font-style: italic; color: #AAA; font-size: 0.95rem; line-height: 1.9;
+  }
+  .quote cite { display: block; margin-top: 10px; color: var(--gold-dark); font-style: normal; font-size: 0.82rem; }
+
+  /* ACCORDION */
+  .accordion { margin-top: 20px; }
+  .acc-item { border: 1px solid rgba(212,175,55,0.15); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .acc-header {
+    padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between;
+    align-items: center; background: var(--dark2); transition: background 0.2s;
+    color: var(--gold); font-weight: 600; font-size: 0.95rem; letter-spacing: 1px;
+  }
+  .acc-header:hover { background: var(--dark3); }
+  .acc-icon { transition: transform 0.3s; }
+  .acc-item.open .acc-icon { transform: rotate(180deg); }
+  .acc-body { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; background: rgba(0,0,0,0.3); }
+  .acc-item.open .acc-body { max-height: 500px; }
+  .acc-body-inner { padding: 20px; color: #AAA; font-size: 0.88rem; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress-bar"></div>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="hero-crown">♔</div>
+  <h1>Искусство Шахмат</h1>
+  <div class="hero-sub">Полное руководство для начинающих и не только</div>
+  <div class="hero-divider"></div>
+  <p class="hero-desc">
+    Шахматы — это не просто игра. Это сражение умов, тысячелетняя традиция и бесконечная глубина стратегии.
+    Здесь вы найдёте всё необходимое, чтобы начать свой путь к мастерству.
+  </p>
+</section>
+
+<!-- NAV -->
+<nav class="sticky-nav">
+  <a href="#goal" class="nav-link">Цель игры</a>
+  <a href="#pieces" class="nav-link">Фигуры</a>
+  <a href="#moves" class="nav-link">Ходы</a>
+  <a href="#special" class="nav-link">Спецправила</a>
+  <a href="#check" class="nav-link">Шах и мат</a>
+  <a href="#tips" class="nav-link">Советы</a>
+  <a href="#faq" class="nav-link">FAQ</a>
+</nav>
+
+<!-- GOAL -->
+<section id="goal">
+  <div class="section-title">Цель Игры</div>
+  <div class="section-sub">Что нужно сделать, чтобы победить</div>
+  <div class="gold-line"></div>
+
+  <div class="quote">
+    «Шахматы — это гимнастика ума» — Блез Паскаль
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <span class="card-icon">♟</span>
+      <h3>Состав армии</h3>
+      <p>Каждый игрок начинает с 16 фигурами: 1 Король, 1 Ферзь, 2 Ладьи, 2 Слона, 2 Коня и 8 Пешек. Белые ходят первыми.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">♚</span>
+      <h3>Главная цель</h3>
+      <p>Объявить сопернику <strong style="color:var(--gold)">мат</strong> — поставить его Короля под удар, из которого тот не может выбраться. Захватить всех фигур не нужно!</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">⚖</span>
+      <h3>Ничья</h3>
+      <p>Игра заканчивается вничью при пате (нет доступных ходов), недостаточном материале, троекратном повторении позиции или правиле 50 ходов.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🎯</span>
+      <h3>Как ходить</h3>
+      <p>Игроки ходят по очереди, строго по одному ходу. Нельзя пропустить ход. Нельзя ставить своего Короля под удар.</p>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+
+  <div style="background:var(--dark2);border:1px solid rgba(212,175,55,0.2);border-radius:14px;padding:30px;margin-top:20px;">
+    <h3 style="color:var(--gold);margin-bottom:16px;font-size:1.2rem;letter-spacing:1px;">⊞ Расстановка фигур</h3>
+    <p style="color:#AAA;margin-bottom:16px;">Доска расставляется так, чтобы в правом нижнем углу от каждого игрока была светлая клетка. Запомните правило: <span style="color:var(--gold)">"Ферзь любит свой цвет"</span> — белый Ферзь стоит на белой клетке, чёрный — на чёрной.</p>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);max-width:320px;border:2px solid var(--gold-dark);border-radius:6px;overflow:hidden;margin:0 auto;">
+      <!-- Row 0: Black back row -->
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♜</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♞</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♝</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♛</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♚</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♝</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♞</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♜</div>
+      <!-- Row 1: Black pawns -->
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;">♟</div>
+      <!-- Empty rows 2-5 -->
+      <div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div>
+      <div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div>
+      <div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div>
+      <div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div><div style="background:#3D2B00;padding:8px;"></div><div style="background:#1A1A1A;padding:8px;"></div>
+      <!-- Row 6: White pawns -->
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♟</div>
+      <!-- Row 7: White back row -->
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♜</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♞</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♝</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♛</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♚</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♝</div>
+      <div style="background:#3D2B00;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♞</div>
+      <div style="background:#1A1A1A;padding:8px;text-align:center;font-size:1.3rem;color:#D4AF37;">♜</div>
+    </div>
+    <p style="text-align:center;color:#555;font-size:0.78rem;margin-top:12px;">Золотые = белые фигуры | Серые = чёрные фигуры</p>
+  </div>
+</section>
+
+<!-- PIECES VALUE -->
+<section id="pieces" style="background:rgba(0,0,0,0.3);padding:80px 20px;max-width:100%;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div class="section-title">Ценность Фигур</div>
+    <div class="section-sub">Относительная сила каждой единицы на доске</div>
+    <div class="gold-line"></div>
+
+    <table class="value-table">
+      <thead>
+        <tr>
+          <th>Фигура</th>
+          <th>Название</th>
+          <th>Ценность</th>
+          <th>Особенность</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="piece-sym-cell">♚</td>
+          <td><strong style="color:var(--gold)">Король</strong></td>
+          <td><span style="color:var(--gold);font-weight:700">∞</span></td>
+          <td>Самая важная. Потеря = конец игры</td>
+        </tr>
+        <tr>
+          <td class="piece-sym-cell">♛</td>
+          <td><strong style="color:var(--gold)">Ферзь</strong></td>
+          <td><span style="color:#FFD700;font-weight:700">9 очков</span></td>
+          <td>Самая мощная по ходам</td>
+        </tr>
+        <tr>
+          <td class="piece-sym-cell">♜</td>
+          <td><strong style="color:#DDD">Ладья</strong></td>
+          <td><span style="color:#EEE;font-weight:700">5 очков</span></td>
+          <td>Сильнее слона, важна в эндшпиле</td>
+        </tr>
+        <tr>
+          <td class="piece-sym-cell">♝</td>
+          <td><strong style="color:#DDD">Слон</strong></td>
+          <td><span style="color:#EEE;font-weight:700">3 очка</span></td>
+          <td>Пара слонов очень опасна</td>
+        </tr>
+        <tr>
+          <td class="piece-sym-cell">♞</td>
+          <td><strong style="color:#DDD">Конь</strong></td>
+          <td><span style="color:#EEE;font-weight:700">3 очка</span></td>
+          <td>Прыгает через фигуры — уникален!</td>
+        </tr>
+        <tr>
+          <td class="piece-sym-cell">♟</td>
+          <td><strong style="color:#AAA">Пешка</strong></td>
+          <td><span style="color:#AAA;font-weight:700">1 очко</span></td>
+          <td>Может стать Ферзём на последней линии</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="quote" style="margin-top:30px;">
+      «Не жертвуйте фигурами без причины. Каждая жертва должна приносить компенсацию в позиции или инициативе.»
+      <cite>— Принцип шахматного материализма</cite>
+    </div>
+  </div>
+</section>
+
+<!-- HOW PIECES MOVE -->
+<section id="moves">
+  <div class="section-title">Как Ходит Каждая Фигура</div>
+  <div class="section-sub">Визуальные схемы для каждой фигуры</div>
+  <div class="gold-line"></div>
+
+  <div class="moves-section">
+
+    <!-- PAWN -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♟</span>
+        <h3>Пешка</h3>
+        <p>Пешка — это солдат. Ходит только вперёд, на одну клетку. С начальной позиции может сделать два шага. Но <strong style="color:var(--gold)">бьёт по диагонали</strong> — только вперёд и только на одну клетку!</p>
+        <div class="tags">
+          <span class="tag">1 шаг вперёд</span>
+          <span class="tag">2 шага с базы</span>
+          <span class="tag">Бьёт по диагонали</span>
+          <span class="tag">Превращение</span>
+        </div>
+      </div>
+      <div id="board-pawn"></div>
+    </div>
+
+    <!-- ROOK -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♜</span>
+        <h3>Ладья</h3>
+        <p>Ладья движется по горизонтали и вертикали на любое количество клеток. Не может прыгать через другие фигуры. Особенно мощна на открытых линиях и в связке с другой ладьёй.</p>
+        <div class="tags">
+          <span class="tag">Горизонталь</span>
+          <span class="tag">Вертикаль</span>
+          <span class="tag">Любое расстояние</span>
+          <span class="tag">Рокировка</span>
+        </div>
+      </div>
+      <div id="board-rook"></div>
+    </div>
+
+    <!-- KNIGHT -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♞</span>
+        <h3>Конь</h3>
+        <p>Конь — самая необычная фигура. Ходит буквой <strong style="color:var(--gold)">«Г»</strong>: два поля в одну сторону и одно в перпендикулярную. Единственная фигура, которая <strong style="color:var(--gold)">перепрыгивает</strong> через остальных!</p>
+        <div class="tags">
+          <span class="tag">Ход буквой «Г»</span>
+          <span class="tag">Прыгает через фигуры</span>
+          <span class="tag">Меняет цвет клетки</span>
+        </div>
+      </div>
+      <div id="board-knight"></div>
+    </div>
+
+    <!-- BISHOP -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♝</span>
+        <h3>Слон</h3>
+        <p>Слон ходит по диагонали на любое количество клеток. Важно: каждый слон всю игру остаётся на клетках одного цвета! Поэтому два слона (на разных цветах) вместе очень сильны.</p>
+        <div class="tags">
+          <span class="tag">Только диагонали</span>
+          <span class="tag">Любое расстояние</span>
+          <span class="tag">Один цвет клеток</span>
+        </div>
+      </div>
+      <div id="board-bishop"></div>
+    </div>
+
+    <!-- QUEEN -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♛</span>
+        <h3>Ферзь</h3>
+        <p>Ферзь — королева поля боя. Объединяет возможности Ладьи и Слона: ходит горизонтально, вертикально и по диагонали на любое расстояние. Самая мощная фигура в шахматах.</p>
+        <div class="tags">
+          <span class="tag">Все направления</span>
+          <span class="tag">Любое расстояние</span>
+          <span class="tag">9 очков</span>
+        </div>
+      </div>
+      <div id="board-queen"></div>
+    </div>
+
+    <!-- KING -->
+    <div class="piece-block">
+      <div class="piece-info">
+        <span class="piece-symbol">♚</span>
+        <h3>Король</h3>
+        <p>Король — главная фигура. Ходит на одну клетку в любом направлении. Нельзя ходить на клетку под ударом! Король не может сам себя «убить». Потеря Короля = поражение.</p>
+        <div class="tags">
+          <span class="tag">1 шаг во все стороны</span>
+          <span class="tag">Не под шах</span>
+          <span class="tag">Рокировка</span>
+        </div>
+      </div>
+      <div id="board-king"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- SPECIAL RULES -->
+<section id="special" style="background:rgba(0,0,0,0.3);padding:80px 20px;max-width:100%;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div class="section-title">Особые Правила</div>
+    <div class="section-sub">Три уникальных механики, которые меняют всё</div>
+    <div class="gold-line"></div>
+
+    <!-- CASTLING -->
+    <div class="special-card">
+      <h3><span style="font-size:1.5rem">♖</span> Рокировка</h3>
+      <p>Рокировка — единственный ход, при котором одновременно двигаются две фигуры: Король и Ладья. Это оборонительный манёвр, который прячет Короля в безопасное место.</p>
+      <p><strong style="color:var(--gold)">Условия рокировки:</strong></p>
+      <ul style="color:#AAA;margin:10px 0 10px 20px;line-height:2;">
+        <li>Ни Король, ни Ладья не ходили ранее</li>
+        <li>Между ними нет фигур</li>
+        <li>Король не стоит под шахом</li>
+        <li>Король не проходит через атакованную клетку</li>
+        <li>Клетка назначения Короля не под ударом</li>
+      </ul>
+
+      <div class="castling-vis">
+        <div>
+          <p style="color:var(--gold);text-align:center;font-size:0.8rem;margin-bottom:8px;">До рокировки</p>
+          <div class="castle-board">
+            <!-- Simplified 8x1 view of first rank -->
+            <div class="cb-cell l">♜</div><div class="cb-cell d"></div><div class="cb-cell l"></div><div class="cb-cell d"></div>
+            <div class="cb-cell l">♚</div><div class="cb-cell d"></div><div class="cb-cell l"></div><div class="cb-cell d">♜</div>
+          </div>
+          <p style="color:#555;text-align:center;font-size:0.7rem;margin-top:4px;">a—h, 8-я горизонталь</p>
+        </div>
+        <div class="arrow">→</div>
+        <div>
+          <p style="color:var(--gold);text-align:center;font-size:0.8rem;margin-bottom:8px;">Короткая (O-O)</p>
+          <div class="castle-board">
+            <div class="cb-cell l">♜</div><div class="cb-cell d"></div><div class="cb-cell l"></div><div class="cb-cell d"></div>
+            <div class="cb-cell l"></div><div class="cb-cell mv">♜</div><div class="cb-cell mv">♚</div><div class="cb-cell d"></div>
+          </div>
+          <p style="color:#555;text-align:center;font-size:0.7rem;margin-top:4px;">Король → g, Ладья → f</p>
+        </div>
+        <div class="arrow">или</div>
+        <div>
+          <p style="color:var(--gold);text-align:center;font-size:0.8rem;margin-bottom:8px;">Длинная (O-O-O)</p>
+          <div class="castle-board">
+            <div class="cb-cell l"></div><div class="cb-cell d">♜</div><div class="cb-cell mv">♚</div><div class="cb-cell d"></div>
+            <div class="cb-cell l"></div><div class="cb-cell d"></div><div class="cb-cell l"></div><div class="cb-cell d">♜</div>
+          </div>
+          <p style="color:#555;text-align:center;font-size:0.7rem;margin-top:4px;">Король → c, Ладья → d</p>
+        </div>
+      </div>
+      <div class="highlight-box">
+        💡 Совет: рокируйтесь как можно раньше! Открытый Король в центре — главная угроза в миттельшпиле.
+      </div>
+    </div>
+
+    <!-- EN PASSANT -->
+    <div class="special-card">
+      <h3><span style="font-size:1.5rem">♙</span> Взятие на проходе (En Passant)</h3>
+      <p>Самое необычное правило. Когда пешка соперника делает ход на <strong style="color:var(--gold)">два поля</strong> вперёд и оказывается рядом с вашей пешкой, вы можете немедленно взять её «на проходе».</p>
+      <p>Ваша пешка перемещается по диагонали, как при обычном взятии, на поле, которое пешка соперника только что миновала. Пешка соперника убирается с доски.</p>
+      <div class="highlight-box">
+        ⚠️ Важно: взятие на проходе возможно только немедленно, на следующем ходу. Если вы сделали другой ход — право на взятие теряется!
+      </div>
+    </div>
+
+    <!-- PROMOTION -->
+    <div class="special-card">
+      <h3><span style="font-size:1.5rem">♛</span> Превращение Пешки (Promotion)</h3>
+      <p>Когда пешка достигает <strong style="color:var(--gold)">последней горизонтали</strong> (противоположного края доски), она обязательно превращается в другую фигуру.</p>
+      <p>Игрок сам выбирает: <strong style="color:var(--gold)">Ферзь, Ладья, Слон или Конь</strong>. На доске может быть несколько Ферзей! В 99% случаев пешку превращают в Ферзя.</p>
+      <div class="highlight-box">
+        🏆 Превращение пешки в Ферзя — часто решающий момент игры. Именно поэтому проходные пешки так ценны в эндшпиле!
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHECK AND CHECKMATE -->
+<section id="check">
+  <div class="section-title">Шах, Мат и Пат</div>
+  <div class="section-sub">Ключевые состояния игры</div>
+  <div class="gold-line"></div>
+
+  <div class="check-box">
+    <h3>⚠ ШАХ</h3>
+    <p>Шах — это когда Король находится под прямым ударом вражеской фигуры. При шахе вы <strong style="color:#FF6B6B">обязаны</strong> немедленно выйти из-под удара. Есть три способа:</p>
+    <ul style="color:#AAA;margin:10px 0 0 20px;line-height:2;">
+      <li><strong style="color:#FF8080">Уйти Королём</strong> — переместить Короля на безопасную клетку</li>
+      <li><strong style="color:#FF8080">Закрыться</strong> — поставить свою фигуру между Королём и атакующей</li>
+      <li><strong style="color:#FF8080">Взять</strong> — побить фигуру, объявившую шах</li>
+    </ul>
+  </div>
+
+  <div class="check-box" style="margin-top:20px;background:linear-gradient(135deg,rgba(139,0,0,0.25),rgba(20,20,20,0.95));border-color:rgba(200,0,0,0.5);">
+    <h3>💀 МАТ (Конец игры)</h3>
+    <p>Мат — это шах, из которого невозможно выйти. Ни один из трёх способов защиты не работает. Игра немедленно завершается. Игрок, получивший мат, проиграл.</p>
+    <p style="margin-top:10px;">Самый быстрый мат в истории — <span style="color:#FF8080"><strong>«Детский мат»</strong></span>: уже на 2-м ходу белых (при ошибках чёрных). Самый известный — <span style="color:#FF8080"><strong>«Мат Филидора»</strong></span>.</p>
+  </div>
+
+  <div class="check-box stale" style="margin-top:20px;">
+    <h3 style="color:var(--silver)">⊘ ПАТ (Ничья)</h3>
+    <p>Пат — ситуация, когда игрок не получает шах, но у него нет ни одного доступного хода. Это ничья! Пат часто бывает спасением для проигрывающей стороны.</p>
+    <p style="margin-top:10px;">Пример: белый Ферзь и Король vs чёрный Король. При неосторожной игре белых чёрный Король может оказаться в пате — и ничья вместо победы!</p>
+  </div>
+
+  <div style="background:var(--dark2);border:1px solid rgba(212,175,55,0.15);border-radius:14px;padding:28px;margin-top:24px;">
+    <h3 style="color:var(--gold);margin-bottom:16px;">Другие виды ничьей</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+      <div style="background:rgba(0,0,0,0.3);padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:var(--gold);font-weight:700;margin-bottom:6px;">Правило 50 ходов</div>
+        <div style="color:#888;font-size:0.85rem;">Если за 50 ходов не было взятия фигур и не ходила пешка — ничья</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.3);padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:var(--gold);font-weight:700;margin-bottom:6px;">Троекратное повторение</div>
+        <div style="color:#888;font-size:0.85rem;">Одна и та же позиция повторяется три раза — ничья</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.3);padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:var(--gold);font-weight:700;margin-bottom:6px;">Недостаточный материал</div>
+        <div style="color:#888;font-size:0.85rem;">Король против Короля, или с одним Слоном/Конём — мат невозможен</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.3);padding:16px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:var(--gold);font-weight:700;margin-bottom:6px;">Соглашение на ничью</div>
+        <div style="color:#888;font-size:0.85rem;">Один игрок предлагает, другой соглашается — ничья</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIPS -->
+<section id="tips">
+  <div class="section-title">Советы Начинающим</div>
+  <div class="section-sub">10 принципов, которые улучшат вашу игру с первой партии</div>
+  <div class="gold-line"></div>
+
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-num">01</div>
+      <h4>Контролируйте центр</h4>
+      <p>Клетки e4, e5, d4, d5 — сердце доски. Кто владеет центром, тот диктует ход игры.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">02</div>
+      <h4>Развивайте фигуры</h4>
+      <p>В начале партии выводите Коней и Слонов. Не делайте два хода одной фигурой подряд без причины.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">03</div>
+      <h4>Рокируйтесь рано</h4>
+      <p>Спрячьте Короля за рокировку в первые 10 ходов. Открытый Король — открытая рана.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">04</div>
+      <h4>Думайте за соперника</h4>
+      <p>Перед каждым ходом спросите: «Что он может сделать следующим ходом?» Лучший способ не попасть в ловушку.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">05</div>
+      <h4>Берегите Ферзя</h4>
+      <p>Не выводите Ферзя слишком рано — его прогонят, и вы потеряете темп. Он нужен, когда у соперника нет хороших атак.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">06</div>
+      <h4>Соединяйте Ладьи</h4>
+      <p>Две связанные Ладьи на открытых линиях смертоносны. Делайте рокировку и соединяйте их.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">07</div>
+      <h4>Не отдавайте фигуры</h4>
+      <p>Каждая фигура ценна. Перед взятием убедитесь, что вы получите хотя бы равноценную компенсацию.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">08</div>
+      <h4>Создавайте угрозы</h4>
+      <p>Атакующая сторона всегда в преимуществе. Заставьте соперника защищаться — тогда вы диктуете игру.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">09</div>
+      <h4>Активируйте Короля в эндшпиле</h4>
+      <p>В конце игры Король становится сильной фигурой! Не бойтесь двигать его к центру, когда угроз мало.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">10</div>
+      <h4>Анализируйте свои партии</h4>
+      <p>После каждой игры разберите ключевые моменты. Лучший учитель — собственные ошибки.</p>
+    </div>
+  </div>
+
+  <div class="quote" style="margin-top:40px;">
+    «Каждый шахматный мастер когда-то был начинающим, который не сдался.»
+    <cite>— Народная мудрость шахматного мира</cite>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-title">Частые Вопросы</div>
+  <div class="section-sub">Ответы на самые популярные вопросы новичков</div>
+  <div class="gold-line"></div>
+
+  <div class="accordion">
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Могу ли я иметь двух Ферзей одновременно?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Да! Когда пешка достигает последней горизонтали, она превращается в любую фигуру, включая Ферзя. На доске теоретически может быть до 9 ферзей одного цвета (1 изначальный + 8 из пешек). На практике такого почти не бывает.
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Что если мне некуда ходить, но Короля не атакуют?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Это пат — ничья! Если у вас нет ни одного легального хода, и при этом ваш Король не под шахом, партия заканчивается вничью. Это один из способов спастись в безнадёжной позиции.
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Обязан ли я открывать шах, если могу?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Нет! Вы можете делать любой легальный ход. Объявлять шах — не обязанность, а право. Иногда лучше не объявлять шах, а усилить позицию.
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Может ли Король взять фигуру, которая его атакует?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Да, но только если после взятия Король не окажется под ударом другой фигуры. Король никогда не может вступить на атакованную клетку, даже чтобы взять вражескую фигуру.
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Что значит «выиграть темп»?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Темп — это право хода. Выиграть темп значит заставить соперника тратить ходы на защиту, пока вы наступаете. Например, атаковать его фигуру, вынуждая её отступить — это «выигрыш темпа».
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Можно ли рокировать под шахом?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Нет! Рокировка запрещена, если: Король под шахом, Король проходит через атакованную клетку, или конечная позиция Короля находится под ударом.
+        </div>
+      </div>
+    </div>
+    <div class="acc-item">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        Как долго длится партия в шахматы?
+        <span class="acc-icon">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          Зависит от контроля времени. Блиц — 3-5 минут на игрока. Рапид — 10-30 минут. Классические шахматы — 90 минут и более. Без часов партия может длиться часами и даже днями на турнирах.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section" id="cta">
+  <div style="font-size:4rem;margin-bottom:20px;animation:crownFloat 3s ease-in-out infinite">♚</div>
+  <div class="cta-title">Вы Готовы?</div>
+  <div class="cta-sub">Теория — это хорошо. Но мастерство приходит только в бою.</div>
+  <a href="index.html?tutorial=1" class="cta-btn" id="training-match-btn">⚔ Обучающий матч</a>
+  <div style="margin-top:40px;color:#444;font-size:0.8rem;letter-spacing:1px;">
+    Сначала теория, потом спокойный матч с подсказками на каждом этапе
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer style="background:rgba(0,0,0,0.5);border-top:1px solid rgba(212,175,55,0.1);padding:30px 20px;text-align:center;">
+  <div style="color:var(--gold);font-weight:700;letter-spacing:3px;margin-bottom:8px;">VIORA STUDIO</div>
+  <div style="color:#444;font-size:0.8rem;">Премиальные браузерные игры</div>
+</footer>
+
+<a href="https://t.me/VioraStudio" target="_blank" id="viora-btn">viora studio</a>
+<a href="index.html" class="back-btn" id="back-to-game-btn">← В игру</a>
+
+<script>
+const tutorialStorageKey = 'chess_start_tutorial';
+const queryParams = new URLSearchParams(window.location.search);
+const tutorialMode = queryParams.get('mode') === 'tutorial';
+if(tutorialMode) {
+  localStorage.setItem(tutorialStorageKey, '1');
+}
+document.getElementById('training-match-btn').addEventListener('click', () => {
+  localStorage.setItem(tutorialStorageKey, '1');
+});
+
+// Progress bar
+window.addEventListener('scroll', () => {
+  const scrolled = window.scrollY;
+  const total = document.documentElement.scrollHeight - window.innerHeight;
+  document.getElementById('progress-bar').style.width = (scrolled/total*100)+'%';
+});
+
+// Accordion
+function toggleAcc(header) {
+  const item = header.parentElement;
+  item.classList.toggle('open');
+}
+
+// Build mini chess boards
+function buildMiniBoard(containerId, pieceRow, pieceCol, pieceGlyph, moveCells, captureCells) {
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const board = document.createElement('div');
+  board.className = 'mini-board';
+  for(let r=0;r<8;r++) {
+    for(let c=0;c<8;c++) {
+      const cell = document.createElement('div');
+      const isLight = (r+c)%2===1;
+      cell.className = 'mini-cell '+(isLight?'light':'dark');
+      if(r===pieceRow&&c===pieceCol) {
+        cell.classList.add('piece-here');
+        const glyph = document.createElement('span');
+        glyph.className='piece-glyph'; glyph.textContent=pieceGlyph;
+        cell.appendChild(glyph);
+      } else if(captureCells&&captureCells.some(m=>m[0]===r&&m[1]===c)) {
+        cell.classList.add('can-capture');
+        const ring=document.createElement('div'); ring.className='ring';
+        cell.appendChild(ring);
+      } else if(moveCells&&moveCells.some(m=>m[0]===r&&m[1]===c)) {
+        cell.classList.add('can-move');
+        const dot=document.createElement('div'); dot.className='dot';
+        cell.appendChild(dot);
+      }
+      board.appendChild(cell);
+    }
+  }
+  container.appendChild(board);
+}
+
+// PAWN (white at row 4, col 3)
+buildMiniBoard('board-pawn', 4, 3, '♟',
+  [[3,3],[2,3]],  // moves
+  [[3,2],[3,4]]   // captures
+);
+
+// ROOK (at center 3,3)
+buildMiniBoard('board-rook', 3, 3, '♜',
+  [[0,3],[1,3],[2,3],[4,3],[5,3],[6,3],[7,3],[3,0],[3,1],[3,2],[3,4],[3,5],[3,6],[3,7]],
+  []
+);
+
+// KNIGHT (at 4,3)
+buildMiniBoard('board-knight', 4, 3, '♞',
+  [[2,2],[2,4],[3,1],[3,5],[5,1],[5,5],[6,2],[6,4]],
+  []
+);
+
+// BISHOP (at 4,3)
+buildMiniBoard('board-bishop', 4, 3, '♝',
+  [[3,2],[2,1],[1,0],[5,2],[6,1],[7,0],[3,4],[2,5],[1,6],[0,7],[5,4],[6,5],[7,6]],
+  []
+);
+
+// QUEEN (at 3,3)
+buildMiniBoard('board-queen', 3, 3, '♛',
+  [
+    [0,3],[1,3],[2,3],[4,3],[5,3],[6,3],[7,3],
+    [3,0],[3,1],[3,2],[3,4],[3,5],[3,6],[3,7],
+    [0,0],[1,1],[2,2],[4,4],[5,5],[6,6],[7,7],
+    [2,4],[1,5],[0,6],[4,2],[5,1],[6,0]
+  ],
+  []
+);
+
+// KING (at 3,3)
+buildMiniBoard('board-king', 3, 3, '♚',
+  [[2,2],[2,3],[2,4],[3,2],[3,4],[4,2],[4,3],[4,4]],
+  []
+);
+
+// Smooth reveal animation on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if(entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, {threshold: 0.1});
+
+document.querySelectorAll('.piece-block, .card, .special-card, .tip-card, .check-box').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(20px)';
+  el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
