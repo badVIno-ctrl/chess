@@ -496,18 +496,6 @@
   }
   .go-btn:hover { background: var(--gold-light); box-shadow: 0 0 25px rgba(212,175,55,0.6); }
 
-  /* VIORA BTN */
-  #viora-btn {
-    position: fixed; left: 20px; bottom: 20px; z-index: 20;
-    background: transparent; border: 1px solid rgba(212,175,55,0.4);
-    color: var(--gold); padding: 6px 14px; border-radius: 5px;
-    cursor: pointer; font-size: 0.72rem; font-weight: 700;
-    letter-spacing: 2px; text-transform: uppercase;
-    transition: all 0.2s; backdrop-filter: blur(10px);
-    background: rgba(8,8,8,0.7);
-  }
-  #viora-btn:hover { border-color: var(--gold); box-shadow: 0 0 15px rgba(212,175,55,0.3); }
-
   /* LOADING */
   #loading {
     position: fixed; inset: 0; z-index: 300;
@@ -538,15 +526,29 @@
     #chat-panel.mobile-open { transform: translateY(0); }
     #chat-toggle-btn {
       top: auto;
-      bottom: calc(138px + var(--safe-bottom));
-      right: 12px;
-      transform: none;
+      left: 50%;
+      right: auto;
+      bottom: calc(96px + var(--safe-bottom));
+      transform: translateX(-50%);
       writing-mode: horizontal-tb;
-      border: 1px solid var(--gold-dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 116px;
+      border: 1px solid rgba(212,175,55,0.32);
       border-radius: 999px;
-      padding: 10px 14px;
+      padding: 10px 16px;
       font-size: 0.72rem;
+      letter-spacing: 0.8px;
+      background: rgba(8,8,8,0.86);
+      color: #F3E3A7;
       box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+    }
+    .hidden-chat #chat-toggle-btn {
+      display: inline-flex !important;
+    }
+    #chat-restore-btn {
+      display: none !important;
     }
     #topbar {
       top: max(10px, var(--safe-top));
@@ -654,14 +656,7 @@
       border: 1px solid rgba(212,175,55,0.16);
       min-height: 38px;
     }
-    #viora-btn {
-      left: 12px;
-      bottom: calc(164px + var(--safe-bottom));
-      border-radius: 999px;
-      padding-inline: 16px;
-    }
     #chat-input-area { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-    #chat-restore-btn { bottom: calc(122px + var(--safe-bottom)); right: 12px; }
     #tutorial-panel {
       left: 12px;
       right: 12px;
@@ -723,9 +718,7 @@
       min-height: 34px;
       font-size: 0.9rem;
     }
-    #viora-btn { bottom: calc(260px + var(--safe-bottom)); }
-    #chat-toggle-btn { bottom: calc(212px + var(--safe-bottom)); }
-    #chat-restore-btn { bottom: calc(200px + var(--safe-bottom)); }
+    #chat-toggle-btn { bottom: calc(188px + var(--safe-bottom)); }
     #tutorial-panel { bottom: calc(278px + var(--safe-bottom)); }
   }
 
@@ -823,7 +816,7 @@
   </div>
   <div id="chat-messages"></div>
 </div>
-<button id="chat-toggle-btn" onclick="toggleChat()">ЧАТ</button>
+<button id="chat-toggle-btn" onclick="toggleChat()">Чат с ИИ</button>
 
 <button id="chat-restore-btn" type="button" onclick="showHiddenChat()">Показать чат</button>
 <!-- ACTION BUTTONS -->
@@ -891,9 +884,6 @@
     <button class="go-btn" type="button" onclick="closeTutorialComplete()">Продолжить</button>
   </div>
 </div>
-
-<!-- VIORA STUDIO -->
-<button id="viora-btn" onclick="window.open('https://t.me/VioraStudio','_blank')">viora studio</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -1951,14 +1941,24 @@ function createPieceGeometry(type) {
     }
     case 'b': {
       const base = new THREE.CylinderGeometry(0.22,0.26,0.12,16);
-      const body = new THREE.CylinderGeometry(0.12,0.2,0.45,16);
-      const head = new THREE.SphereGeometry(0.15,16,16);
-      const tip = new THREE.ConeGeometry(0.05,0.12,8);
+      const collar = new THREE.TorusGeometry(0.12, 0.03, 8, 18);
+      const body = new THREE.CylinderGeometry(0.09,0.19,0.5,18);
+      const shoulder = new THREE.SphereGeometry(0.11,16,16);
+      const mitreBody = new THREE.CylinderGeometry(0.08,0.12,0.24,18);
+      const mitreBase = new THREE.SphereGeometry(0.12,16,16);
+      const mitreTop = new THREE.SphereGeometry(0.09,16,16);
+      const tip = new THREE.SphereGeometry(0.045,10,10);
+      const slit = new THREE.BoxGeometry(0.035,0.22,0.14);
       return mergeGeometries([
         translateGeo(base,0,0.06,0),
-        translateGeo(body,0,0.345,0),
-        translateGeo(head,0,0.68,0),
-        translateGeo(tip,0,0.87,0)
+        translateGeo(collar,0,0.16,0),
+        translateGeo(body,0,0.37,0),
+        translateGeo(shoulder,0,0.58,0),
+        translateGeo(mitreBody,0,0.79,0),
+        translateGeo(mitreBase,0,0.71,0),
+        translateGeo(mitreTop,0,0.91,0),
+        translateGeo(tip,0,0.98,0),
+        translateGeo(slit,0.06,0.84,0)
       ]);
     }
     case 'q': {
@@ -2786,12 +2786,27 @@ function updateTournamentDisplay() {
   updateTournamentInfoVisibility();
 }
 
+function updateMobileChatTrigger() {
+  const toggleBtn = document.getElementById('chat-toggle-btn');
+  const restoreBtn = document.getElementById('chat-restore-btn');
+  const panel = document.getElementById('chat-panel');
+  if(!toggleBtn || !panel) return;
+  const isMobile = window.innerWidth <= 768;
+  if(isMobile) {
+    toggleBtn.textContent = panel.classList.contains('mobile-open') ? 'Свернуть чат' : 'Чат с ИИ';
+  } else {
+    toggleBtn.textContent = 'ЧАТ';
+  }
+  if(restoreBtn && isMobile) restoreBtn.textContent = 'Чат с ИИ';
+}
+
 function setChatHidden(hidden) {
   chessGame.chatHidden = hidden;
   document.body.classList.toggle('hidden-chat', hidden);
   if(hidden) {
     document.getElementById('chat-panel').classList.remove('collapsed', 'mobile-open');
   }
+  updateMobileChatTrigger();
 }
 
 function hideChatCompletely() {
@@ -2804,6 +2819,7 @@ function showHiddenChat() {
   const panel = document.getElementById('chat-panel');
   if(window.innerWidth <= 768) panel.classList.add('mobile-open');
   else panel.classList.remove('collapsed');
+  updateMobileChatTrigger();
   saveGame();
 }
 
@@ -3149,13 +3165,6 @@ function selectPromotion(type) {
   }
 }
 
-function toggleChat() {
-  const panel=document.getElementById('chat-panel');
-  const isMobile=window.innerWidth<=768;
-  if(isMobile) { panel.classList.toggle('mobile-open'); }
-  else { panel.classList.toggle('collapsed'); }
-}
-
 // ============================================================
 // SAVE / LOAD
 // ============================================================
@@ -3323,6 +3332,7 @@ function toggleChat() {
   const isMobile = window.innerWidth<=768;
   if(isMobile) panel.classList.toggle('mobile-open');
   else panel.classList.toggle('collapsed');
+  updateMobileChatTrigger();
   saveGame();
 }
 
@@ -3516,6 +3526,7 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
   applyResponsiveCameraPreset();
+  updateMobileChatTrigger();
 }
 
 // ============================================================
@@ -3557,6 +3568,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   initThree();
   applyResponsiveCameraPreset(true);
+  updateMobileChatTrigger();
   updateScoreDisplay();
   resetTournamentClocks();
   updateTournamentDisplay();
