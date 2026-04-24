@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -38,7 +38,28 @@
     text-align: center; flex: 1; padding: 0 10px;
     text-shadow: 0 0 15px rgba(212,175,55,0.5);
   }
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+  }
   .difficulty-btns { display: flex; gap: 6px; }
+  .topbar-link-btn {
+    background: transparent;
+    border: none;
+    color: var(--gold);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 6px 0;
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+  .topbar-link-btn:hover {
+    color: var(--gold-light);
+    text-shadow: 0 0 14px rgba(212,175,55,0.28);
+  }
   .diff-btn {
     background: transparent; border: 1px solid var(--gold-dark);
     color: var(--gold); padding: 5px 12px; border-radius: 4px;
@@ -77,12 +98,30 @@
   }
 
   #tournament-card {
+    position: fixed;
+    top: 72px;
+    right: 20px;
+    z-index: 24;
     display: flex; align-items: center; gap: 18px;
-    margin-left: auto;
+    width: min(720px, calc(100vw - 40px));
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+  #tournament-card.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
   }
   .tournament-copy {
     display: flex; flex-direction: column; gap: 3px;
     min-width: 0;
+  }
+  .tournament-copy-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .tournament-title {
     color: var(--gold); font-size: 0.86rem; font-weight: 700; letter-spacing: 0.8px;
@@ -95,6 +134,23 @@
     color: #9B9B9B;
     font-size: 0.72rem;
     letter-spacing: 0.5px;
+  }
+  .tournament-close-btn {
+    margin-left: auto;
+    background: rgba(255,255,255,0.04);
+    color: var(--gold);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 999px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    transition: all 0.2s ease;
+  }
+  .tournament-close-btn:hover {
+    background: rgba(212,175,55,0.12);
+    border-color: rgba(212,175,55,0.45);
   }
   .switch {
     position: relative; width: 58px; height: 32px; flex: 0 0 auto;
@@ -467,10 +523,16 @@
       font-size: 0.82rem; padding: 0;
       text-align: left;
     }
-    .difficulty-btns {
+    .topbar-actions {
       width: 100%;
       justify-content: space-between;
-      order: 4;
+      order: 2;
+      margin-left: 0;
+    }
+    .difficulty-btns {
+      flex: 1;
+      justify-content: space-between;
+      order: 0;
     }
     .diff-btn {
       flex: 1;
@@ -483,18 +545,23 @@
       gap: 10px;
     }
     .hud-card { padding: 12px; border-radius: 12px; }
-    #score-card, #tournament-card {
+    #score-card {
       width: 100%;
       justify-content: space-between;
     }
     #tournament-card {
+      top: 108px;
+      right: 12px;
+      left: 12px;
+      width: auto;
       flex-wrap: wrap;
       gap: 12px;
-      margin-left: 0;
     }
     .tournament-sub { display: none; }
     #tournament-copy-compact { display: block; width: 100%; }
     .tournament-copy { flex: 1 1 140px; }
+    .tournament-copy-head { align-items: flex-start; }
+    .tournament-close-btn { padding: 5px 9px; }
     #clock-card {
       width: 100%;
       justify-content: space-between;
@@ -541,12 +608,22 @@
     }
     #topbar .logo { font-size: 0.78rem; letter-spacing: 1.2px; }
     #topbar .status { font-size: 0.78rem; }
+    .topbar-actions {
+      align-items: stretch;
+      gap: 8px;
+    }
+    .topbar-link-btn {
+      font-size: 0.74rem;
+      white-space: nowrap;
+      padding-top: 8px;
+    }
     .difficulty-btns { gap: 4px; }
     .diff-btn {
       padding: 8px 4px;
       font-size: 0.64rem;
     }
     #hud-panel { top: 118px; }
+    #tournament-card { top: 102px; }
     .hud-card {
       padding: 10px 11px;
       border-radius: 12px;
@@ -605,10 +682,15 @@
 <div id="topbar">
   <div class="logo">♔ Шахматы</div>
   <div class="status" id="status-text">Ваш ход</div>
-  <div class="difficulty-btns">
-    <button class="diff-btn active" onclick="setDifficulty('easy')" id="btn-easy">Легко</button>
-    <button class="diff-btn" onclick="setDifficulty('medium')" id="btn-medium">Стандарт</button>
-    <button class="diff-btn" onclick="setDifficulty('hard')" id="btn-hard">Сложно</button>
+  <div class="topbar-actions">
+    <button class="topbar-link-btn" id="tournament-menu-trigger" type="button" onclick="toggleTournamentInfo()">
+      Турнирный режим
+    </button>
+    <div class="difficulty-btns">
+      <button class="diff-btn active" onclick="setDifficulty('easy')" id="btn-easy">Легко</button>
+      <button class="diff-btn" onclick="setDifficulty('medium')" id="btn-medium">Стандарт</button>
+      <button class="diff-btn" onclick="setDifficulty('hard')" id="btn-hard">Сложно</button>
+    </div>
   </div>
 </div>
 
@@ -626,7 +708,12 @@
   </div>
   <div class="hud-card" id="tournament-card">
     <div class="tournament-copy">
-      <span class="tournament-title">Турнирный режим</span>
+      <div class="tournament-copy-head">
+        <span class="tournament-title">Турнирный режим</span>
+        <button class="tournament-close-btn" id="tournament-close-btn" type="button" onclick="closeTournamentInfo()">
+          Закрыть
+        </button>
+      </div>
       <span class="tournament-sub">Без подсветки ходов, с шахматными часами и автоходом при просрочке.</span>
     </div>
     <span id="tournament-copy-compact">Часы и автоход по времени</span>
@@ -2369,6 +2456,28 @@ function updateScoreDisplay() {
   document.getElementById('ai-score').textContent = chessGame.scores.ai;
 }
 
+function updateTournamentInfoVisibility() {
+  const card = document.getElementById('tournament-card');
+  const trigger = document.getElementById('tournament-menu-trigger');
+  if(!card || !trigger) return;
+  const expanded = !!chessGame.tournamentInfoExpanded;
+  card.classList.toggle('open', expanded);
+  trigger.setAttribute('aria-expanded', String(expanded));
+}
+
+function toggleTournamentInfo() {
+  chessGame.tournamentInfoExpanded = !chessGame.tournamentInfoExpanded;
+  updateTournamentInfoVisibility();
+  saveGame();
+}
+
+function closeTournamentInfo() {
+  if(!chessGame.tournamentInfoExpanded) return;
+  chessGame.tournamentInfoExpanded = false;
+  updateTournamentInfoVisibility();
+  saveGame();
+}
+
 function updateTournamentDisplay() {
   const isActive = chessGame.tournamentMode;
   document.getElementById('tournament-toggle').checked = isActive;
@@ -2381,6 +2490,7 @@ function updateTournamentDisplay() {
   blackBox.classList.toggle('active', isActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
   whiteBox.classList.toggle('tournament-off', !isActive);
   blackBox.classList.toggle('tournament-off', !isActive);
+  updateTournamentInfoVisibility();
 }
 
 function setChatHidden(hidden) {
@@ -2942,6 +3052,7 @@ function saveGame() {
       capturedByBlack: chessGame.engine.capturedByBlack,
       chat: chatMsgs,
       tournamentMode: chessGame.tournamentMode,
+      tournamentInfoExpanded: chessGame.tournamentInfoExpanded,
       clocks: chessGame.clocks,
       scores: chessGame.scores,
       chatHidden: chessGame.chatHidden,
@@ -2965,6 +3076,7 @@ function loadGame() {
     chessGame.engine.capturedByBlack = s.capturedByBlack || [];
     chessGame.difficulty = s.difficulty || 'medium';
     chessGame.tournamentMode = !!s.tournamentMode;
+    chessGame.tournamentInfoExpanded = !!s.tournamentInfoExpanded;
     chessGame.clocks = s.clocks || { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS };
     chessGame.scores = s.scores || { player:0, ai:0 };
     chessGame.trainingMatch = !!s.trainingMatch;
@@ -3115,6 +3227,7 @@ const chessGame = {
   engine: new ChessEngine(),
   difficulty: 'medium',
   tournamentMode: false,
+  tournamentInfoExpanded: false,
   chatHidden: false,
   clocks: { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS },
   scores: { player: 0, ai: 0 },
@@ -3133,6 +3246,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // Prevent context menu
   document.addEventListener('contextmenu',e=>e.preventDefault());
   initHelperWorker();
+  document.addEventListener('click', e => {
+    if(!chessGame.tournamentInfoExpanded) return;
+    const card = document.getElementById('tournament-card');
+    const trigger = document.getElementById('tournament-menu-trigger');
+    if((card && card.contains(e.target)) || (trigger && trigger.contains(e.target))) return;
+    closeTournamentInfo();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key==='Escape') closeTournamentInfo();
+  });
 
   initThree();
   applyResponsiveCameraPreset(true);
