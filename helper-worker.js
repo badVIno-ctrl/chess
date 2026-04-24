@@ -700,6 +700,7 @@ function negamax(engine, depth, alpha, beta, side, ctx, ply=0) {
 
 function pickEasyMove(engine, side) {
   const legal = orderedMoves(engine, side);
+  if(!legal.length) return null;
   const scored = legal.map(move => {
     engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
     const score = evaluateFromPerspective(engine, side);
@@ -707,7 +708,7 @@ function pickEasyMove(engine, side) {
     return { move, score };
   }).sort((a,b) => a.score - b.score);
   const pool = scored.slice(0, Math.max(1, Math.ceil(scored.length * 0.5)));
-  return pool[Math.floor(Math.random() * pool.length)].move;
+  return pool[Math.floor(Math.random() * pool.length)]?.move || scored[0]?.move || legal[0] || null;
 }
 
 function pickMediumMove(engine, side) {
@@ -834,6 +835,44 @@ function algebraicSquare(r,c) {
   return `${'abcdefgh'[c]}${'87654321'[r]}`;
 }
 
+function findLegalMoveByCode(engine, side, code) {
+  const legal = engine.getAllLegalMoves(side);
+  const [fr, fc, tr, tc] = code.split('').map(Number);
+  return legal.find(move =>
+    move.from.r===fr && move.from.c===fc && move.to.r===tr && move.to.c===tc
+  ) || null;
+}
+
+function getTutorialScriptMove(engine, side) {
+  if(side!==WHITE) return null;
+  const sequence = (engine.moveHistory || []).map(move =>
+    `${move.from.r}${move.from.c}${move.to.r}${move.to.c}`
+  ).join('|');
+
+  const script = {
+    '': ['6444', '6343'],
+    '1434': ['7655', '7152'],
+    '1232': ['7655', '7152'],
+    '1545': ['7655', '7152'],
+    '1333': ['7655', '7152'],
+    '1434|7655': ['7542', '7645'],
+    '1434|7152': ['7542', '6443'],
+    '1232|7655': ['7645', '6244'],
+    '1232|7152': ['7645', '6244'],
+    '1434|7655|0625': ['7476'],
+    '1434|7152|0625': ['7476'],
+    '1232|7655|0625': ['7476'],
+    '1232|7152|1636': ['7476']
+  };
+
+  const candidates = script[sequence] || [];
+  for(const code of candidates) {
+    const found = findLegalMoveByCode(engine, side, code);
+    if(found) return found;
+  }
+  return null;
+}
+
 function getPieceName(type) {
   return {
     p:'пешкой',
@@ -849,19 +888,27 @@ function buildTutorialHint(state) {
   const engine = new ChessEngine();
   engine.loadState(state);
   const side = state.turn;
-  const bestMove = pickEasyMove(engine, side);
-  if(!bestMove) return { text:'Сейчас хороших ходов нет: нужно просто выходить из трудной позиции.' };
+  const bestMove = getTutorialScriptMove(engine, side) || pickEasyMove(engine, side);
+  if(!bestMove) return { text:'Сейчас хороших ходов нет: нужно просто выйти из трудной позиции и не подставить короля.' };
   const piece = engine.getPiece(bestMove.from.r, bestMove.from.c);
   const target = engine.getPiece(bestMove.to.r, bestMove.to.c);
   const from = algebraicSquare(bestMove.from.r, bestMove.from.c);
   const to = algebraicSquare(bestMove.to.r, bestMove.to.c);
 
   let text = `Попробуйте сходить ${getPieceName(piece.type)} с ${from} на ${to}.`;
-  if(bestMove.to.castle) text = 'Сейчас хороший момент для рокировки: спрячьте короля и соедините ладьи.';
-  else if(piece.type==='p' && (bestMove.to.c===3 || bestMove.to.c===4)) text += ' Это помогает контролировать центр доски.';
-  else if(piece.type==='n' || piece.type==='b') text += ' Так фигура выходит в активную игру и помогает развитию.';
-  else if(target) text += ' Так вы забираете фигуру соперника и упрощаете позицию.';
-  else text += ' Это аккуратный развивающий ход без лишнего риска.';
+  if(bestMove.to.castle) {
+    text = 'Сейчас лучший момент для рокировки: спрячьте короля и соедините ладьи. Для новичка это один из самых полезных навыков.';
+  } else if(piece.type==='p' && (bestMove.to.c===3 || bestMove.to.c===4)) {
+    text += ' Это помогает занять центр доски. Кто контролирует центр, тот обычно раньше развивает атаку.';
+  } else if(piece.type==='n') {
+    text += ' Конь выходит в игру и начинает контролировать важные центральные клетки. Для дебюта это почти всегда полезно.';
+  } else if(piece.type==='b') {
+    text += ' Так слон открывается и начинает давить по диагонали. Хорошо развитые лёгкие фигуры делают позицию устойчивой.';
+  } else if(target) {
+    text += ' Это безопасный размен: вы выигрываете материал и упрощаете позицию без лишнего риска.';
+  } else {
+    text += ' Это спокойный и понятный развивающий ход, который улучшает вашу позицию шаг за шагом.';
+  }
 
   return {
     move: bestMove,
@@ -872,15 +919,13 @@ function buildTutorialHint(state) {
 
 function getTutorialIntro(engine) {
   return [
-    { piece:'king', squares:[{r:7,c:4},{r:0,c:4}], text:'Это короли. Главная цель партии — защитить своего короля и поставить мат королю соперника.' },
-    { piece:'queen', squares:[{r:7,c:3},{r:0,c:3}], text:'Это ферзи. Они самые сильные по ходам и любят действовать на больших расстояниях.' },
-    { piece:'rook', squares:[{r:7,c:0},{r:7,c:7},{r:0,c:0},{r:0,c:7}], text:'Ладьи ходят по прямым линиям и особенно сильны на открытых вертикалях и горизонталях.' },
-    { piece:'bishop', squares:[{r:7,c:2},{r:7,c:5},{r:0,c:2},{r:0,c:5}], text:'Слоны ходят по диагоналям. Один слон играет по белым полям, другой по чёрным.' },
-    { piece:'knight', squares:[{r:7,c:1},{r:7,c:6},{r:0,c:1},{r:0,c:6}], text:'Кони прыгают буквой Г и умеют перепрыгивать через другие фигуры.' },
-    { piece:'pawn', squares:Array.from({length:8}, (_,i) => ({r:6,c:i})).concat(Array.from({length:8}, (_,i) => ({r:1,c:i}))), text:'Пешки идут вперёд, бьют по диагонали и могут превратиться в сильную фигуру на последней линии.' }
+    { piece:'king', squares:[{r:7,c:4},{r:0,c:4}], text:'Это короли. Главная задача в шахматах: защитить своего короля и однажды поставить мат королю соперника.' },
+    { piece:'queen', squares:[{r:7,c:3},{r:0,c:3}], text:'Это ферзи. Они очень сильные, но в дебюте их лучше не выводить слишком рано, чтобы не потерять темп.' },
+    { piece:'knight', squares:[{r:7,c:1},{r:7,c:6},{r:0,c:1},{r:0,c:6}], text:'Это кони. Для новичка это одни из самых важных фигур в начале партии: они быстро выходят в бой и прыгают через другие фигуры.' },
+    { piece:'bishop', squares:[{r:7,c:2},{r:7,c:5},{r:0,c:2},{r:0,c:5}], text:'Это слоны. Они ходят по диагоналям и становятся сильнее, когда пешки и кони помогают им открыть линии.' },
+    { piece:'pawn', squares:Array.from({length:8}, (_,i) => ({r:6,c:i})).concat(Array.from({length:8}, (_,i) => ({r:1,c:i}))), text:'Пешки двигаются вперёд, бьют по диагонали и помогают занимать центр. Обычно первые хорошие ходы в партии начинаются именно с пешек.' }
   ];
 }
-
 
 self.onmessage = event => {
   const data = event.data || {};
