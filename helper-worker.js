@@ -3,9 +3,9 @@ const WHITE = 'w';
 const BLACK = 'b';
 const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const CHECKMATE_SCORE = 100000;
-const QUIESCENCE_CAP_DEPTH = 6;
-const SEARCH_LIMITS = { easy: 0, medium: 340, hard: 3200 };
-const HARD_MAX_DEPTH = 8;
+const QUIESCENCE_CAP_DEPTH = 10;
+const SEARCH_LIMITS = { easy: 0, medium: 340, hard: 9000 };
+const HARD_MAX_DEPTH = 10;
 const TT_EXACT = 0;
 const TT_LOWER = 1;
 const TT_UPPER = 2;
@@ -467,6 +467,25 @@ function evaluateKingShelter(engine, color) {
   return score;
 }
 
+function evaluatePiecePressure(engine, color) {
+  let penalty = 0;
+  const enemy = color===WHITE ? BLACK : WHITE;
+
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const piece = engine.getPiece(r,c);
+    if(!piece || piece.color!==color || piece.type==='k') continue;
+    const attacked = engine.isSquareAttacked(r, c, enemy);
+    if(!attacked) continue;
+
+    const defended = engine.isSquareAttacked(r, c, color);
+    const value = PIECE_VALUES[piece.type] || 0;
+    if(!defended) penalty += Math.round(value * 0.22);
+    else penalty += Math.round(value * 0.08);
+  }
+
+  return penalty;
+}
+
 function evaluateBoard(engine) {
   let score = 0;
   let whiteBishops = 0;
@@ -514,6 +533,8 @@ function evaluateBoard(engine) {
   score -= evaluatePawnStructure(engine, BLACK);
   score += evaluateKingShelter(engine, WHITE);
   score -= evaluateKingShelter(engine, BLACK);
+  score -= evaluatePiecePressure(engine, WHITE);
+  score += evaluatePiecePressure(engine, BLACK);
 
   const endgameFactor = whiteMaterial + blackMaterial < 2600 ? 1 : 0;
   if(endgameFactor) {
@@ -562,6 +583,31 @@ function registerKiller(ctx, ply, key) {
   if(killers[0]===key) return;
   killers[1] = killers[0];
   killers[0] = key;
+}
+
+function tacticalBlunderPenalty(engine, side) {
+  const enemy = engine.turn;
+  let maxPenalty = 0;
+  const enemyMoves = orderedMoves(engine, enemy).slice(0, 18);
+
+  for(const move of enemyMoves) {
+    const captured = getCapturePiece(engine, move);
+    const attacker = engine.getPiece(move.from.r, move.from.c);
+    if(!captured || !attacker || captured.color!==side) continue;
+
+    const victimVal = PIECE_VALUES[captured.type] || 0;
+    const attackerVal = PIECE_VALUES[attacker.type] || 0;
+    let penalty = victimVal - Math.round(attackerVal * 0.35);
+
+    if(captured.type==='q') penalty += 900;
+    else if(captured.type==='r') penalty += 220;
+    else if(captured.type==='b' || captured.type==='n') penalty += 120;
+
+    if(!engine.isSquareAttacked(move.to.r, move.to.c, side)) penalty += 90;
+    maxPenalty = Math.max(maxPenalty, penalty);
+  }
+
+  return maxPenalty;
 }
 
 function quiescence(engine, alpha, beta, side, ctx, ply=0) {
@@ -713,7 +759,10 @@ function pickHardMove(engine, side) {
     let localScore = bestScore;
     for(const move of rootMoves) {
       engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
-      const result = -negamax(engine, depth-1, -Infinity, Infinity, side, ctx, 1);
+      let result = -negamax(engine, depth-1, -Infinity, Infinity, side, ctx, 1);
+      if(!ctx.timeUp) {
+        result -= tacticalBlunderPenalty(engine, side);
+      }
       engine.undoMove();
       if(ctx.timeUp) return bestMove;
       if(result > localScore || !localBest) {
@@ -733,18 +782,30 @@ function pickHardMove(engine, side) {
 
 function getOpeningMove(engine, side) {
   const history = engine.moveHistory || [];
+  if(side!==BLACK) return null;
   const book = {
-    '': ['1434','1232','1636','1535'],
-    '6444': ['1434','1232'],
-    '6343': ['1434','1636'],
-    '6242': ['1434'],
+    '': ['1434','1232','1636','1545','1333'],
+    '6444': ['1434','1232','1545'],
+    '6343': ['1232','1434','1545'],
+    '6242': ['1232','1434'],
     '6646': ['1434','1232'],
-    '7152': ['1434','1232'],
-    '7645': ['1434','1232'],
-    '6444|7655': ['0625','0122'],
-    '6444|7152': ['0625'],
+    '6141': ['1232','1434'],
+    '7152': ['1232','1434'],
+    '7655': ['1232','1434'],
+    '7354': ['1232','1434'],
+    '6444|7655': ['0625','0122','1434'],
+    '6444|7152': ['0625','1545'],
+    '6444|6343': ['1232','0625'],
+    '6444|6343|7655': ['0625'],
+    '6444|7655|7554': ['0122','0614'],
+    '6444|7655|7354': ['0625','0122'],
+    '6444|7354': ['0122','0625'],
     '6343|7655': ['0625','1434'],
-    '6343|7152': ['1636','0625']
+    '6343|7152': ['1636','0625'],
+    '6343|6244': ['1232','0625'],
+    '6343|6244|7152': ['0625'],
+    '6242|7152': ['1232','0625'],
+    '6242|7655': ['1232','0625']
   };
   const sequence = history.map(move => `${move.from.r}${move.from.c}${move.to.r}${move.to.c}`).join('|');
   const candidates = book[sequence];

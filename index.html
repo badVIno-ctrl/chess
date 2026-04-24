@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -2282,7 +2282,7 @@ function requestHelper(action, extra={}) {
   }
 
   const requestId = `helper-${++helperRequestSeq}`;
-  const bestMoveTimeout = extra.difficulty==='hard' ? 4500 : 1800;
+  const bestMoveTimeout = extra.difficulty==='hard' ? 11000 : 1800;
   const timeoutMs = action==='bestMove' ? bestMoveTimeout : 2500;
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
