@@ -14,6 +14,9 @@
     --dark2: #1A1A1A;
     --silver: #C0C0C0;
     --glass: rgba(15,15,15,0.85);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-stack-gap: 10px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #070707; font-family: 'Segoe UI', Arial, sans-serif; }
@@ -521,11 +524,37 @@
   /* MOBILE */
   @media (max-width: 768px) {
     html, body { overscroll-behavior: none; }
-    #chat-panel { width: 100%; top: auto; bottom: 0; height: min(52vh, 420px); transform: translateY(100%); border-left: none; border-top: 1px solid rgba(212,175,55,0.3); }
+    #chat-panel {
+      width: 100%;
+      top: auto;
+      bottom: 0;
+      height: min(56vh, 460px);
+      transform: translateY(100%);
+      border-left: none;
+      border-top: 1px solid rgba(212,175,55,0.3);
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -20px 48px rgba(0,0,0,0.38);
+    }
     #chat-panel.mobile-open { transform: translateY(0); }
-    #chat-toggle-btn { top: auto; bottom: 150px; right: 12px; transform: none; writing-mode: horizontal-tb; border: 1px solid var(--gold-dark); border-radius: 999px; padding: 10px 14px; font-size: 0.72rem; }
+    #chat-toggle-btn {
+      top: auto;
+      bottom: calc(138px + var(--safe-bottom));
+      right: 12px;
+      transform: none;
+      writing-mode: horizontal-tb;
+      border: 1px solid var(--gold-dark);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 0.72rem;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+    }
     #topbar {
-      padding: 10px 12px 12px;
+      top: max(10px, var(--safe-top));
+      left: 12px;
+      right: 12px;
+      border: 1px solid rgba(212,175,55,0.22);
+      border-radius: 18px;
+      padding: 12px;
       gap: 10px;
       align-items: flex-start;
     }
@@ -548,15 +577,23 @@
     }
     .diff-btn {
       flex: 1;
+      min-height: 40px;
       padding: 8px 6px;
       font-size: 0.68rem;
+      border-radius: 10px;
     }
     #hud-panel {
-      top: 126px; left: 12px; right: 12px;
+      top: calc(108px + var(--safe-top));
+      left: 12px;
+      right: 12px;
       flex-direction: column;
-      gap: 10px;
+      gap: var(--mobile-stack-gap);
     }
-    .hud-card { padding: 12px; border-radius: 12px; }
+    .hud-card {
+      padding: 12px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(10,10,10,0.9), rgba(10,10,10,0.68));
+    }
     #score-card {
       width: 100%;
       justify-content: space-between;
@@ -577,23 +614,36 @@
     #clock-card {
       width: 100%;
       justify-content: space-between;
+      gap: 8px;
     }
-    .clock-box { flex: 1; min-width: 0; }
+    .clock-box {
+      flex: 1;
+      min-width: 0;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+    }
     #action-btns {
-      left: 12px; right: 12px; bottom: 14px;
-      flex-direction: row;
-      flex-wrap: wrap;
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + var(--safe-bottom));
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
     .action-btn {
-      flex: 1 1 calc(50% - 6px);
-      padding: 10px 8px;
+      min-height: 44px;
+      padding: 10px 10px;
       font-size: 0.71rem;
       letter-spacing: 0.4px;
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.24);
     }
     #captured-area {
-      left: 12px; right: 12px; bottom: 118px;
-      flex-direction: row; justify-content: space-between;
+      left: 12px;
+      right: 12px;
+      bottom: calc(116px + var(--safe-bottom));
+      flex-direction: row;
+      justify-content: space-between;
       gap: 8px;
     }
     .captured-row {
@@ -604,12 +654,23 @@
       border: 1px solid rgba(212,175,55,0.16);
       min-height: 38px;
     }
-    #viora-btn { left: 12px; bottom: 170px; }
+    #viora-btn {
+      left: 12px;
+      bottom: calc(164px + var(--safe-bottom));
+      border-radius: 999px;
+      padding-inline: 16px;
+    }
     #chat-input-area { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-    #chat-restore-btn { bottom: 132px; right: 12px; }
+    #chat-restore-btn { bottom: calc(122px + var(--safe-bottom)); right: 12px; }
     #tutorial-panel {
-      left: 12px; right: 12px; bottom: 190px;
+      left: 12px;
+      right: 12px;
+      bottom: calc(182px + var(--safe-bottom));
       width: auto;
+      max-height: min(38vh, 280px);
+      overflow: auto;
+      border-radius: 20px;
+      box-shadow: 0 16px 42px rgba(0,0,0,0.38);
     }
   }
 
@@ -634,8 +695,8 @@
       padding: 8px 4px;
       font-size: 0.64rem;
     }
-    #hud-panel { top: 118px; }
-    #tournament-card { top: 102px; }
+    #hud-panel { top: calc(102px + var(--safe-top)); }
+    #tournament-card { top: calc(92px + var(--safe-top)); }
     .hud-card {
       padding: 10px 11px;
       border-radius: 12px;
@@ -644,23 +705,28 @@
     .score-value { font-size: 1.05rem; }
     .clock-box { padding: 8px 10px; }
     .clock-time { font-size: 1rem; }
-    #action-btns { gap: 6px; }
+    #action-btns {
+      gap: 6px;
+      grid-template-columns: 1fr;
+    }
     .action-btn {
       min-height: 42px;
       font-size: 0.68rem;
     }
     #captured-area {
-      bottom: 110px;
+      bottom: calc(194px + var(--safe-bottom));
       gap: 6px;
+      flex-direction: column;
     }
     .captured-row {
+      max-width: none;
       min-height: 34px;
       font-size: 0.9rem;
     }
-    #viora-btn { bottom: 154px; }
-    #chat-toggle-btn { bottom: 118px; }
-    #chat-restore-btn { bottom: 112px; }
-    #tutorial-panel { bottom: 170px; }
+    #viora-btn { bottom: calc(260px + var(--safe-bottom)); }
+    #chat-toggle-btn { bottom: calc(212px + var(--safe-bottom)); }
+    #chat-restore-btn { bottom: calc(200px + var(--safe-bottom)); }
+    #tutorial-panel { bottom: calc(278px + var(--safe-bottom)); }
   }
 
   .thinking-dots span {
@@ -840,9 +906,21 @@ const TOURNAMENT_INITIAL_MS = 5 * 60 * 1000;
 const TOURNAMENT_INCREMENT_MS = 3000;
 const PROMOTION_TYPES = ['q', 'r', 'b', 'n'];
 const TUTORIAL_STORAGE_KEY = 'chess_start_tutorial';
+const BOARD_FILES = 'abcdefgh';
+const BOARD_RANKS = '87654321';
+const STANDARD_BACK_RANK = Object.freeze(['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']);
 const helperRequests = new Map();
 let helperRequestSeq = 0;
 let helperWorker = null;
+
+function isLightSquare(r, c) {
+  // FIDE orientation: a1 is dark and the near-right corner h1 is light.
+  return (r + c) % 2 === 0;
+}
+
+function algebraicSquare(r, c) {
+  return `${BOARD_FILES[c]}${BOARD_RANKS[r]}`;
+}
 
 class ChessEngine {
   constructor() { this.reset(); }
@@ -858,12 +936,11 @@ class ChessEngine {
   }
   initBoard() {
     const b = Array(8).fill(null).map(()=>Array(8).fill(null));
-    const backRow = ['r','n','b','q','k','b','n','r'];
     for(let c=0;c<8;c++) {
-      b[0][c] = {type:backRow[c], color:BLACK};
+      b[0][c] = {type:STANDARD_BACK_RANK[c], color:BLACK};
       b[1][c] = {type:'p', color:BLACK};
       b[6][c] = {type:'p', color:WHITE};
-      b[7][c] = {type:backRow[c], color:WHITE};
+      b[7][c] = {type:STANDARD_BACK_RANK[c], color:WHITE};
     }
     return b;
   }
@@ -1158,8 +1235,10 @@ const PST = {
 
 const CHECKMATE_SCORE = 100000;
 const QUIESCENCE_CAP_DEPTH = 6;
-const HARD_MIN_THINK_MS = 900;
-const HARD_MAX_THINK_MS = 2400;
+const HARD_MIN_THINK_MS = 1600;
+const HARD_MAX_THINK_MS = 5200;
+const HARD_FALLBACK_MAX_DEPTH = 8;
+const ASPIRATION_WINDOW = 55;
 
 function mirrorRowForColor(row, color) {
   return color === WHITE ? row : 7 - row;
@@ -1257,8 +1336,60 @@ function evaluateBoard(engine, quick=false) {
   return score;
 }
 
+function evaluateDevelopment(engine, color) {
+  let score = 0;
+  const homeRank = color===WHITE ? 7 : 0;
+  const minors = [
+    { c:1, type:'n' }, { c:6, type:'n' },
+    { c:2, type:'b' }, { c:5, type:'b' }
+  ];
+  for(const square of minors) {
+    const piece = engine.getPiece(homeRank, square.c);
+    if(!piece || piece.color!==color || piece.type!==square.type) score += 10;
+  }
+  const queenHome = engine.getPiece(homeRank, 3);
+  const undevelopedMinors = minors.reduce((count, square) => {
+    const piece = engine.getPiece(homeRank, square.c);
+    return count + ((piece && piece.color===color && piece.type===square.type) ? 1 : 0);
+  }, 0);
+  if((!queenHome || queenHome.color!==color || queenHome.type!=='q') && undevelopedMinors >= 2) score -= 14;
+  return score;
+}
+
+function evaluateHangingPieces(engine, color) {
+  const enemy = color===WHITE ? BLACK : WHITE;
+  let penalty = 0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const piece = engine.getPiece(r,c);
+    if(!piece || piece.color!==color || piece.type==='k') continue;
+    if(!engine.isSquareAttacked(r, c, enemy)) continue;
+    const defended = engine.isSquareAttacked(r, c, color);
+    const value = PIECE_VALUES[piece.type] || 0;
+    if(!defended) penalty += Math.round(value * 0.38);
+    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.1);
+  }
+  return penalty;
+}
+
+function evaluateCenterPresence(engine, color) {
+  const squares = [[3,3],[3,4],[4,3],[4,4],[2,3],[2,4],[5,3],[5,4]];
+  let score = 0;
+  for(const [r,c] of squares) {
+    const piece = engine.getPiece(r,c);
+    if(piece && piece.color===color) score += (r>=3 && r<=4 ? 7 : 3);
+    if(engine.isSquareAttacked(r,c,color)) score += (r>=3 && r<=4 ? 3 : 1);
+  }
+  return score;
+}
+
 function evaluateFromSide(engine) {
-  const base = evaluateBoard(engine, true);
+  let base = evaluateBoard(engine, true);
+  base += evaluateDevelopment(engine, WHITE);
+  base -= evaluateDevelopment(engine, BLACK);
+  base += evaluateCenterPresence(engine, WHITE);
+  base -= evaluateCenterPresence(engine, BLACK);
+  base -= evaluateHangingPieces(engine, WHITE);
+  base += evaluateHangingPieces(engine, BLACK);
   return engine.turn===WHITE ? base : -base;
 }
 
@@ -1278,6 +1409,15 @@ function getCapturePiece(engine, move) {
     return engine.getPiece(capRow, move.to.c);
   }
   return engine.getPiece(move.to.r, move.to.c);
+}
+
+function isPromotionMove(engine, move) {
+  const mover = engine.getPiece(move.from.r, move.from.c);
+  return !!(mover && mover.type==='p' && (move.to.r===0 || move.to.r===7));
+}
+
+function isQuietMove(engine, move) {
+  return !getCapturePiece(engine, move) && !move.to.castle && !isPromotionMove(engine, move);
 }
 
 function scoreMove(engine, move, ply, ctx) {
@@ -1363,11 +1503,31 @@ function negamax(engine, depth, alpha, beta, ply, ctx) {
   let bestScore = -Infinity;
   let bestMoveKey = null;
 
-  for(const m of legalMoves) {
+  for(let moveIndex = 0; moveIndex < legalMoves.length; moveIndex++) {
+    const m = legalMoves[moveIndex];
+    const mover = engine.getPiece(m.from.r,m.from.c);
+    const quietMove = !!mover && isQuietMove(engine, m);
     engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
     let ext = 0;
     if(engine.isInCheck(engine.turn)) ext = 1;
-    const score = -negamax(engine, depth-1+ext, -beta, -alpha, ply+1, ctx);
+    if(mover && mover.type==='p' && (m.to.r===0 || m.to.r===7 || m.to.r===1 || m.to.r===6)) ext = Math.max(ext, 1);
+    const fullDepth = depth - 1 + ext;
+    let searchDepth = fullDepth;
+    if(depth >= 3 && ply >= 2 && moveIndex >= 3 && quietMove && ext===0) {
+      searchDepth = Math.max(0, fullDepth - 1);
+    }
+    let score;
+    if(moveIndex===0) {
+      score = -negamax(engine, fullDepth, -beta, -alpha, ply+1, ctx);
+    } else {
+      score = -negamax(engine, searchDepth, -alpha-1, -alpha, ply+1, ctx);
+      if(!ctx.timeUp && score > alpha && searchDepth !== fullDepth) {
+        score = -negamax(engine, fullDepth, -alpha-1, -alpha, ply+1, ctx);
+      }
+      if(!ctx.timeUp && score > alpha && score < beta) {
+        score = -negamax(engine, fullDepth, -beta, -alpha, ply+1, ctx);
+      }
+    }
     engine.undoMove();
     if(ctx.timeUp) return alpha;
 
@@ -1441,14 +1601,41 @@ function getBestMoveByDifficulty(engine, difficulty) {
 
   if(difficulty==='medium') {
     let best = null;
-    let bestVal = Infinity;
+    let bestVal = -Infinity;
     for(const m of legal) {
       engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
-      const val = evaluateBoard(engine);
+      const ctx = {
+        nodes: 0,
+        timeUp: false,
+        deadline: performance.now() + 700,
+        tt: new Map(),
+        history: Object.create(null),
+        killers: [],
+        ttBestMove: null,
+        lastScore: null
+      };
+      let val = negamax(engine, 4, -Infinity, Infinity, 1, ctx);
+      if(!ctx.timeUp) {
+        val = -val;
+      } else {
+        val = evaluateBoard(engine);
+      }
+      if(!ctx.timeUp) {
+        const side = engine.turn;
+        const enemyMoves = engine.getAllLegalMoves(side).slice(0, 18);
+        let extraPenalty = 0;
+        for(const reply of enemyMoves) {
+          const captured = getCapturePiece(engine, reply);
+          const attacker = engine.getPiece(reply.from.r, reply.from.c);
+          if(!captured || !attacker || captured.color!==BLACK) continue;
+          extraPenalty = Math.max(extraPenalty, (PIECE_VALUES[captured.type] || 0) - Math.round((PIECE_VALUES[attacker.type] || 0) * 0.35));
+        }
+        val += extraPenalty;
+      }
       engine.undoMove();
-      if(val < bestVal) { bestVal = val; best = m; }
+      if(val > bestVal) { bestVal = val; best = m; }
     }
-    return best;
+    return best || legal[0];
   }
 
   const openingMove = openingReplyHard(engine);
@@ -1461,31 +1648,81 @@ function getBestMoveByDifficulty(engine, difficulty) {
     tt: new Map(),
     history: Object.create(null),
     killers: [],
-    ttBestMove: null
+    ttBestMove: null,
+    lastScore: null
   };
 
   let bestMove = legal[0];
-  const maxDepth = 6;
+  const maxDepth = HARD_FALLBACK_MAX_DEPTH;
 
   for(let depth=1; depth<=maxDepth; depth++) {
     if(ctx.timeUp) break;
-    const rootMoves = [...legal];
-    orderMoves(engine, rootMoves, 0, ctx);
+    let alphaWindow = Number.isFinite(ctx.lastScore) ? ctx.lastScore - ASPIRATION_WINDOW : -Infinity;
+    let betaWindow = Number.isFinite(ctx.lastScore) ? ctx.lastScore + ASPIRATION_WINDOW : Infinity;
+    let completedDepth = false;
+    while(!completedDepth && !ctx.timeUp) {
+      const rootMoves = [...legal];
+      orderMoves(engine, rootMoves, 0, ctx);
+      rootMoves.sort((a,b) => {
+        if(moveToKey(a)===moveToKey(bestMove)) return -1;
+        if(moveToKey(b)===moveToKey(bestMove)) return 1;
+        return 0;
+      });
 
-    let localBest = null;
-    let localBestScore = -Infinity;
-    for(const m of rootMoves) {
-      engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
-      const score = -negamax(engine, depth-1, -Infinity, Infinity, 1, ctx);
-      engine.undoMove();
-      if(ctx.timeUp) break;
-      if(score > localBestScore) {
-        localBestScore = score;
-        localBest = m;
+      let alpha = alphaWindow;
+      let beta = betaWindow;
+      const alphaOrig = alpha;
+      const betaOrig = beta;
+      let localBest = null;
+      let localBestScore = -Infinity;
+
+      for(let moveIndex = 0; moveIndex < rootMoves.length; moveIndex++) {
+        const m = rootMoves[moveIndex];
+        const mover = engine.getPiece(m.from.r,m.from.c);
+        const quietMove = !!mover && isQuietMove(engine, m);
+        engine.makeMove(m.from.r,m.from.c,m.to.r,m.to.c,m.to);
+        let fullDepth = depth - 1;
+        if(mover && mover.type==='p' && (m.to.r===0 || m.to.r===7 || m.to.r===1 || m.to.r===6)) fullDepth += 1;
+        let score;
+        if(moveIndex===0) {
+          score = -negamax(engine, fullDepth, -beta, -alpha, 1, ctx);
+        } else {
+          let reducedDepth = fullDepth;
+          if(depth >= 4 && quietMove) reducedDepth = Math.max(0, fullDepth - 1);
+          score = -negamax(engine, reducedDepth, -alpha-1, -alpha, 1, ctx);
+          if(!ctx.timeUp && score > alpha && reducedDepth !== fullDepth) {
+            score = -negamax(engine, fullDepth, -alpha-1, -alpha, 1, ctx);
+          }
+          if(!ctx.timeUp && score > alpha && score < beta) {
+            score = -negamax(engine, fullDepth, -beta, -alpha, 1, ctx);
+          }
+        }
+        engine.undoMove();
+        if(ctx.timeUp) break;
+        if(score > localBestScore) {
+          localBestScore = score;
+          localBest = m;
+        }
+        if(score > alpha) alpha = score;
+        if(alpha >= beta) break;
       }
-    }
-    if(!ctx.timeUp && localBest) {
-      bestMove = localBest;
+
+      if(ctx.timeUp) break;
+      if(localBestScore <= alphaOrig && Number.isFinite(alphaOrig)) {
+        alphaWindow = alphaOrig - ASPIRATION_WINDOW * 3;
+        betaWindow = betaOrig;
+        continue;
+      }
+      if(localBestScore >= betaOrig && Number.isFinite(betaOrig)) {
+        alphaWindow = alphaOrig;
+        betaWindow = betaOrig + ASPIRATION_WINDOW * 3;
+        continue;
+      }
+      if(localBest) {
+        bestMove = localBest;
+        ctx.lastScore = localBestScore;
+      }
+      completedDepth = true;
     }
   }
 
@@ -1579,7 +1816,7 @@ function buildBoard() {
 
   // Squares
   for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
-    const isLight = (r+c)%2===1;
+    const isLight = isLightSquare(r, c);
     const geo = new THREE.BoxGeometry(SQUARE_SIZE, 0.08, SQUARE_SIZE);
     const mat = new THREE.MeshStandardMaterial({
       color: isLight ? 0x8B6914 : 0x1A1A1A,
@@ -1624,14 +1861,13 @@ function createBoardLabelSprite(text) {
 }
 
 function addBoardCoordinates() {
-  const files = 'abcdefgh';
   for(let i=0; i<8; i++) {
-    const fileLabel = createBoardLabelSprite(files[i]);
+    const fileLabel = createBoardLabelSprite(BOARD_FILES[i]);
     if(fileLabel) {
       fileLabel.position.set(i - BOARD_OFFSET, 0.16, BOARD_OFFSET + 0.8);
       boardGroup.add(fileLabel);
     }
-    const rankLabel = createBoardLabelSprite(String(8 - i));
+    const rankLabel = createBoardLabelSprite(BOARD_RANKS[i]);
     if(rankLabel) {
       rankLabel.position.set(-BOARD_OFFSET - 0.8, 0.16, i - BOARD_OFFSET);
       boardGroup.add(rankLabel);
@@ -2757,12 +2993,10 @@ function getSystemPrompt() {
 }
 
 const PIECE_NAMES={p:'пешку',r:'ладью',n:'коня',b:'слона',q:'ферзя',k:'короля'};
-const COL_NAMES=['a','b','c','d','e','f','g','h'];
-const ROW_NAMES=['8','7','6','5','4','3','2','1'];
 
 function moveToAlgebraic(move, piece) {
-  const from=`${COL_NAMES[move.from.c]}${ROW_NAMES[move.from.r]}`;
-  const to=`${COL_NAMES[move.to.c]}${ROW_NAMES[move.to.r]}`;
+  const from = algebraicSquare(move.from.r, move.from.c);
+  const to = algebraicSquare(move.to.r, move.to.c);
   return `${PIECE_NAMES[piece.type]} с ${from} на ${to}`;
 }
 

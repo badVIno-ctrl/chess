@@ -1,11 +1,14 @@
 
 const WHITE = 'w';
 const BLACK = 'b';
+const BOARD_FILES = 'abcdefgh';
+const BOARD_RANKS = '87654321';
 const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const CHECKMATE_SCORE = 100000;
 const QUIESCENCE_CAP_DEPTH = 10;
-const SEARCH_LIMITS = { easy: 0, medium: 340, hard: 9000 };
-const HARD_MAX_DEPTH = 10;
+const SEARCH_LIMITS = { easy: 0, medium: 340, hard: 16000 };
+const HARD_MAX_DEPTH = 12;
+const ASPIRATION_WINDOW = 55;
 const TT_EXACT = 0;
 const TT_LOWER = 1;
 const TT_UPPER = 2;
@@ -486,6 +489,56 @@ function evaluatePiecePressure(engine, color) {
   return penalty;
 }
 
+function evaluateDevelopment(engine, color) {
+  let score = 0;
+  const homeRank = color===WHITE ? 7 : 0;
+  const minorSquares = [
+    { c:1, type:'n' }, { c:6, type:'n' },
+    { c:2, type:'b' }, { c:5, type:'b' }
+  ];
+  for(const square of minorSquares) {
+    const piece = engine.getPiece(homeRank, square.c);
+    if(!piece || piece.color!==color || piece.type!==square.type) score += 11;
+  }
+  const queenHome = engine.getPiece(homeRank, 3);
+  const undevelopedMinors = minorSquares.reduce((count, square) => {
+    const piece = engine.getPiece(homeRank, square.c);
+    return count + ((piece && piece.color===color && piece.type===square.type) ? 1 : 0);
+  }, 0);
+  if((!queenHome || queenHome.color!==color || queenHome.type!=='q') && undevelopedMinors >= 2) score -= 16;
+  return score;
+}
+
+function evaluateHangingPieces(engine, color) {
+  const enemy = color===WHITE ? BLACK : WHITE;
+  let penalty = 0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const piece = engine.getPiece(r, c);
+    if(!piece || piece.color!==color || piece.type==='k') continue;
+    if(!engine.isSquareAttacked(r, c, enemy)) continue;
+    const defended = engine.isSquareAttacked(r, c, color);
+    const value = PIECE_VALUES[piece.type] || 0;
+    if(!defended) penalty += Math.round(value * 0.42);
+    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.12);
+  }
+  return penalty;
+}
+
+function evaluateCenterPresence(engine, color) {
+  const centralSquares = [
+    [3,3], [3,4], [4,3], [4,4],
+    [2,2], [2,3], [2,4], [2,5],
+    [5,2], [5,3], [5,4], [5,5]
+  ];
+  let score = 0;
+  for(const [r,c] of centralSquares) {
+    const piece = engine.getPiece(r, c);
+    if(piece && piece.color===color) score += (r>=3 && r<=4 && c>=3 && c<=4) ? 8 : 4;
+    if(engine.isSquareAttacked(r, c, color)) score += (r>=3 && r<=4 && c>=3 && c<=4) ? 3 : 1;
+  }
+  return score;
+}
+
 function evaluateBoard(engine) {
   let score = 0;
   let whiteBishops = 0;
@@ -533,8 +586,14 @@ function evaluateBoard(engine) {
   score -= evaluatePawnStructure(engine, BLACK);
   score += evaluateKingShelter(engine, WHITE);
   score -= evaluateKingShelter(engine, BLACK);
+  score += evaluateDevelopment(engine, WHITE);
+  score -= evaluateDevelopment(engine, BLACK);
+  score += evaluateCenterPresence(engine, WHITE);
+  score -= evaluateCenterPresence(engine, BLACK);
   score -= evaluatePiecePressure(engine, WHITE);
   score += evaluatePiecePressure(engine, BLACK);
+  score -= evaluateHangingPieces(engine, WHITE);
+  score += evaluateHangingPieces(engine, BLACK);
 
   const endgameFactor = whiteMaterial + blackMaterial < 2600 ? 1 : 0;
   if(endgameFactor) {
@@ -583,6 +642,15 @@ function registerKiller(ctx, ply, key) {
   if(killers[0]===key) return;
   killers[1] = killers[0];
   killers[0] = key;
+}
+
+function isPromotionMove(engine, move) {
+  const mover = engine.getPiece(move.from.r, move.from.c);
+  return !!(mover && mover.type==='p' && (move.to.r===0 || move.to.r===7));
+}
+
+function isQuietMove(engine, move) {
+  return !getCapturePiece(engine, move) && !move.to.castle && !isPromotionMove(engine, move);
 }
 
 function tacticalBlunderPenalty(engine, side) {
@@ -670,11 +738,31 @@ function negamax(engine, depth, alpha, beta, side, ctx, ply=0) {
 
   let bestScore = -Infinity;
   let bestMoveKey = '';
-  for(const move of legalMoves) {
+  for(let moveIndex = 0; moveIndex < legalMoves.length; moveIndex++) {
+    const move = legalMoves[moveIndex];
     const key = moveKey(move);
+    const mover = engine.getPiece(move.from.r, move.from.c);
+    const quietMove = !!mover && isQuietMove(engine, move);
     engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
-    const extension = engine.isInCheck(engine.turn) ? 1 : 0;
-    const score = -negamax(engine, depth-1+extension, -beta, -alpha, side, ctx, ply+1);
+    let extension = engine.isInCheck(engine.turn) ? 1 : 0;
+    if(mover && mover.type==='p' && (move.to.r===0 || move.to.r===7 || move.to.r===1 || move.to.r===6)) extension = Math.max(extension, 1);
+    const fullDepth = depth - 1 + extension;
+    let searchDepth = fullDepth;
+    if(depth >= 3 && ply >= 2 && moveIndex >= 3 && quietMove && extension===0) {
+      searchDepth = Math.max(0, fullDepth - 1);
+    }
+    let score;
+    if(moveIndex===0) {
+      score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply+1);
+    } else {
+      score = -negamax(engine, searchDepth, -alpha-1, -alpha, side, ctx, ply+1);
+      if(!ctx.timeUp && score > alpha && searchDepth !== fullDepth) {
+        score = -negamax(engine, fullDepth, -alpha-1, -alpha, side, ctx, ply+1);
+      }
+      if(!ctx.timeUp && score > alpha && score < beta) {
+        score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply+1);
+      }
+    }
     engine.undoMove();
     if(ctx.timeUp) return 0;
     if(score > bestScore) {
@@ -713,6 +801,7 @@ function pickEasyMove(engine, side) {
 
 function pickMediumMove(engine, side) {
   const legal = orderedMoves(engine, side);
+  if(!legal.length) return null;
   const scored = [];
   for(const move of legal) {
     engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
@@ -724,13 +813,16 @@ function pickMediumMove(engine, side) {
       nodes: 0,
       timeUp: false
     };
-    const reply = negamax(engine, 3, -Infinity, Infinity, side, ctx, 1);
+    const reply = negamax(engine, 4, -Infinity, Infinity, side, ctx, 1);
+    let score = -reply;
+    if(!ctx.timeUp) {
+      score -= tacticalBlunderPenalty(engine, side);
+    }
     engine.undoMove();
-    scored.push({ move, score: -reply });
+    scored.push({ move, score });
   }
   scored.sort((a,b) => b.score - a.score);
-  const pool = scored.slice(0, Math.min(3, scored.length));
-  return pool[Math.floor(Math.random() * pool.length)].move;
+  return scored[0]?.move || legal[0] || null;
 }
 
 function pickHardMove(engine, side) {
@@ -751,6 +843,15 @@ function pickHardMove(engine, side) {
   };
 
   for(let depth=2; depth<=HARD_MAX_DEPTH; depth++) {
+    let alphaWindow = Number.isFinite(bestScore) ? bestScore - ASPIRATION_WINDOW : -Infinity;
+    let betaWindow = Number.isFinite(bestScore) ? bestScore + ASPIRATION_WINDOW : Infinity;
+    let completedDepth = false;
+    while(!completedDepth) {
+      if(ctx.timeUp) return bestMove;
+      let alpha = alphaWindow;
+      let beta = betaWindow;
+      const alphaOrig = alpha;
+      const betaOrig = beta;
     rootMoves.sort((a,b) => {
       if(moveKey(a)===moveKey(bestMove)) return -1;
       if(moveKey(b)===moveKey(bestMove)) return 1;
@@ -758,9 +859,27 @@ function pickHardMove(engine, side) {
     });
     let localBest = bestMove;
     let localScore = bestScore;
-    for(const move of rootMoves) {
+    for(let moveIndex = 0; moveIndex < rootMoves.length; moveIndex++) {
+      const move = rootMoves[moveIndex];
+      const mover = engine.getPiece(move.from.r, move.from.c);
+      const quietMove = !!mover && isQuietMove(engine, move);
       engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
-      let result = -negamax(engine, depth-1, -Infinity, Infinity, side, ctx, 1);
+      let fullDepth = depth - 1;
+      if(mover && mover.type==='p' && (move.to.r===0 || move.to.r===7 || move.to.r===1 || move.to.r===6)) fullDepth += 1;
+      let result;
+      if(moveIndex===0) {
+        result = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, 1);
+      } else {
+        let reducedDepth = fullDepth;
+        if(depth >= 4 && quietMove) reducedDepth = Math.max(0, fullDepth - 1);
+        result = -negamax(engine, reducedDepth, -alpha-1, -alpha, side, ctx, 1);
+        if(!ctx.timeUp && result > alpha && reducedDepth !== fullDepth) {
+          result = -negamax(engine, fullDepth, -alpha-1, -alpha, side, ctx, 1);
+        }
+        if(!ctx.timeUp && result > alpha && result < beta) {
+          result = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, 1);
+        }
+      }
       if(!ctx.timeUp) {
         result -= tacticalBlunderPenalty(engine, side);
       }
@@ -770,13 +889,27 @@ function pickHardMove(engine, side) {
         localScore = result;
         localBest = move;
       }
+      if(result > alpha) alpha = result;
+      if(alpha >= beta) break;
       if(performance.now() > ctx.deadline) {
         ctx.timeUp = true;
         return bestMove;
       }
     }
-    bestMove = localBest;
-    bestScore = localScore;
+      if(localScore <= alphaOrig && Number.isFinite(alphaOrig)) {
+        alphaWindow = alphaOrig - ASPIRATION_WINDOW * 3;
+        betaWindow = betaOrig;
+        continue;
+      }
+      if(localScore >= betaOrig && Number.isFinite(betaOrig)) {
+        alphaWindow = alphaOrig;
+        betaWindow = betaOrig + ASPIRATION_WINDOW * 3;
+        continue;
+      }
+      bestMove = localBest;
+      bestScore = localScore;
+      completedDepth = true;
+    }
   }
   return bestMove;
 }
@@ -832,7 +965,7 @@ function getBestMove(state, difficulty) {
 }
 
 function algebraicSquare(r,c) {
-  return `${'abcdefgh'[c]}${'87654321'[r]}`;
+  return `${BOARD_FILES[c]}${BOARD_RANKS[r]}`;
 }
 
 function findLegalMoveByCode(engine, side, code) {
@@ -920,7 +1053,7 @@ function buildTutorialHint(state) {
 function getTutorialIntro(engine) {
   return [
     { piece:'king', squares:[{r:7,c:4},{r:0,c:4}], text:'Это короли. Главная задача в шахматах: защитить своего короля и однажды поставить мат королю соперника.' },
-    { piece:'queen', squares:[{r:7,c:3},{r:0,c:3}], text:'Это ферзи. Они очень сильные, но в дебюте их лучше не выводить слишком рано, чтобы не потерять темп.' },
+    { piece:'queen', squares:[{r:7,c:3},{r:0,c:3}], text:'Это ферзи. Белый ферзь стартует на d1, а чёрный на d8: ферзь всегда стоит на клетке своего цвета. Они очень сильные, но в дебюте их лучше не выводить слишком рано, чтобы не потерять темп.' },
     { piece:'knight', squares:[{r:7,c:1},{r:7,c:6},{r:0,c:1},{r:0,c:6}], text:'Это кони. Для новичка это одни из самых важных фигур в начале партии: они быстро выходят в бой и прыгают через другие фигуры.' },
     { piece:'bishop', squares:[{r:7,c:2},{r:7,c:5},{r:0,c:2},{r:0,c:5}], text:'Это слоны. Они ходят по диагоналям и становятся сильнее, когда пешки и кони помогают им открыть линии.' },
     { piece:'pawn', squares:Array.from({length:8}, (_,i) => ({r:6,c:i})).concat(Array.from({length:8}, (_,i) => ({r:1,c:i}))), text:'Пешки двигаются вперёд, бьют по диагонали и помогают занимать центр. Обычно первые хорошие ходы в партии начинаются именно с пешек.' }
