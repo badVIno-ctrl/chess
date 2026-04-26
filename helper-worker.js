@@ -5,10 +5,10 @@ const BOARD_FILES = 'abcdefgh';
 const BOARD_RANKS = '87654321';
 const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const CHECKMATE_SCORE = 100000;
-const QUIESCENCE_CAP_DEPTH = 10;
-const SEARCH_LIMITS = { easy: 0, medium: 650, hard: 6200 };
-const HARD_MAX_DEPTH = 15;
-const ASPIRATION_WINDOW = 55;
+const QUIESCENCE_CAP_DEPTH = 12;
+const SEARCH_LIMITS = { easy: 0, medium: 700, hard: 9000 };
+const HARD_MAX_DEPTH = 17;
+const ASPIRATION_WINDOW = 45;
 const TT_EXACT = 0;
 const TT_LOWER = 1;
 const TT_UPPER = 2;
@@ -470,6 +470,36 @@ function evaluateKingShelter(engine, color) {
   return score;
 }
 
+function findKing(engine, color) {
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const piece = engine.getPiece(r, c);
+    if(piece && piece.type==='k' && piece.color===color) return { r, c };
+  }
+  return null;
+}
+
+function evaluateKingAttack(engine, color) {
+  const enemy = color===WHITE ? BLACK : WHITE;
+  const kingPos = findKing(engine, enemy);
+  if(!kingPos) return 0;
+
+  let score = 0;
+  for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) {
+    const rr = kingPos.r + dr;
+    const cc = kingPos.c + dc;
+    if(rr<0 || rr>7 || cc<0 || cc>7) continue;
+    if(engine.isSquareAttacked(rr, cc, color)) {
+      score += (dr===0 && dc===0) ? 12 : 6;
+    }
+    const occupant = engine.getPiece(rr, cc);
+    if(occupant && occupant.color===color && occupant.type!=='k') {
+      score += 4;
+    }
+  }
+
+  return score;
+}
+
 function evaluatePiecePressure(engine, color) {
   let penalty = 0;
   const enemy = color===WHITE ? BLACK : WHITE;
@@ -518,8 +548,8 @@ function evaluateHangingPieces(engine, color) {
     if(!engine.isSquareAttacked(r, c, enemy)) continue;
     const defended = engine.isSquareAttacked(r, c, color);
     const value = PIECE_VALUES[piece.type] || 0;
-    if(!defended) penalty += Math.round(value * 0.5);
-    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.16);
+    if(!defended) penalty += Math.round(value * 0.62);
+    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.2);
   }
   return penalty;
 }
@@ -586,6 +616,8 @@ function evaluateBoard(engine) {
   score -= evaluatePawnStructure(engine, BLACK);
   score += evaluateKingShelter(engine, WHITE);
   score -= evaluateKingShelter(engine, BLACK);
+  score += evaluateKingAttack(engine, WHITE);
+  score -= evaluateKingAttack(engine, BLACK);
   score += evaluateDevelopment(engine, WHITE);
   score -= evaluateDevelopment(engine, BLACK);
   score += evaluateCenterPresence(engine, WHITE);
@@ -597,7 +629,7 @@ function evaluateBoard(engine) {
 
   const endgameFactor = whiteMaterial + blackMaterial < 2600 ? 1 : 0;
   if(endgameFactor) {
-    score += (whiteMaterial - blackMaterial) * 0.02;
+    score += (whiteMaterial - blackMaterial) * 0.03;
   }
 
   return score;
@@ -656,7 +688,7 @@ function isQuietMove(engine, move) {
 function tacticalBlunderPenalty(engine, side) {
   const enemy = engine.turn;
   let maxPenalty = 0;
-  const enemyMoves = orderedMoves(engine, enemy).slice(0, 24);
+  const enemyMoves = orderedMoves(engine, enemy).slice(0, 28);
 
   for(const move of enemyMoves) {
     const captured = getCapturePiece(engine, move);
@@ -665,14 +697,14 @@ function tacticalBlunderPenalty(engine, side) {
 
     const victimVal = PIECE_VALUES[captured.type] || 0;
     const attackerVal = PIECE_VALUES[attacker.type] || 0;
-    let penalty = victimVal - Math.round(attackerVal * 0.28);
+    let penalty = victimVal - Math.round(attackerVal * 0.2);
 
-    if(captured.type==='q') penalty += 1100;
-    else if(captured.type==='r') penalty += 320;
-    else if(captured.type==='b' || captured.type==='n') penalty += 180;
-    else if(captured.type==='p') penalty += 40;
+    if(captured.type==='q') penalty += 1450;
+    else if(captured.type==='r') penalty += 420;
+    else if(captured.type==='b' || captured.type==='n') penalty += 240;
+    else if(captured.type==='p') penalty += 55;
 
-    if(!engine.isSquareAttacked(move.to.r, move.to.c, side)) penalty += 140;
+    if(!engine.isSquareAttacked(move.to.r, move.to.c, side)) penalty += 210;
     maxPenalty = Math.max(maxPenalty, penalty);
   }
 
@@ -843,7 +875,7 @@ function pickHardMove(engine, side) {
     timeUp: false
   };
 
-  for(let depth=2; depth<=HARD_MAX_DEPTH; depth++) {
+  for(let depth=3; depth<=HARD_MAX_DEPTH; depth++) {
     let alphaWindow = Number.isFinite(bestScore) ? bestScore - ASPIRATION_WINDOW : -Infinity;
     let betaWindow = Number.isFinite(bestScore) ? bestScore + ASPIRATION_WINDOW : Infinity;
     let completedDepth = false;
