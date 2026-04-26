@@ -35,7 +35,53 @@
     border-bottom: 1px solid rgba(212,175,55,0.3);
     box-shadow: 0 2px 30px rgba(0,0,0,0.8);
   }
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
   #topbar .logo { color: var(--gold); font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .mobile-topbar-clock,
+  .mobile-topbar-score {
+    display: none;
+  }
+  .mobile-topbar-clock {
+    align-items: center;
+    gap: 6px;
+  }
+  .mobile-clock-pill {
+    min-width: 58px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(212,175,55,0.22);
+    background: linear-gradient(180deg, rgba(18,18,18,0.92), rgba(8,8,8,0.82));
+    box-shadow: inset 0 0 16px rgba(212,175,55,0.04);
+  }
+  .mobile-clock-pill.active {
+    border-color: rgba(212,175,55,0.72);
+    box-shadow: inset 0 0 18px rgba(212,175,55,0.08), 0 0 18px rgba(212,175,55,0.12);
+  }
+  .mobile-clock-pill.tournament-off {
+    opacity: 0.72;
+  }
+  .mobile-clock-side {
+    display: block;
+    color: #8A8A8A;
+    font-size: 0.5rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .mobile-clock-time {
+    display: block;
+    color: #F5F0D2;
+    font-size: 0.78rem;
+    line-height: 1;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
   #topbar .status {
     color: var(--gold); font-size: 0.95rem; font-weight: 600;
     text-align: center; flex: 1; padding: 0 10px;
@@ -95,6 +141,37 @@
   .topbar-link-btn:hover {
     color: var(--gold-light);
     text-shadow: 0 0 14px rgba(212,175,55,0.28);
+  }
+  .mobile-topbar-score {
+    align-items: center;
+    gap: 8px;
+    margin-right: 2px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(212,175,55,0.18);
+    background: rgba(255,255,255,0.03);
+  }
+  .mobile-score-side {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .mobile-score-label {
+    color: #8F8F8F;
+    font-size: 0.54rem;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+  }
+  .mobile-score-value {
+    color: #F5F0D2;
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .mobile-score-divider {
+    color: rgba(212,175,55,0.5);
+    font-size: 0.78rem;
+    font-weight: 700;
   }
   .diff-btn {
     background: transparent; border: 1px solid var(--gold-dark);
@@ -725,7 +802,17 @@
       gap: 10px;
       align-items: flex-start;
     }
+    .topbar-brand {
+      width: 100%;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
     #topbar .logo { font-size: 0.86rem; letter-spacing: 1.5px; }
+    .mobile-topbar-clock {
+      display: inline-flex;
+      flex: 0 0 auto;
+    }
     #topbar .status {
       order: 3; width: 100%;
       font-size: 0.82rem; padding: 0;
@@ -738,10 +825,20 @@
       margin-left: 0;
     }
     .mode-btns { order: 0; }
-    .difficulty-btns {
-      flex: 1;
-      justify-content: space-between;
+    .mobile-topbar-score {
+      display: inline-flex;
       order: 1;
+      flex: 0 0 auto;
+    }
+    #tournament-menu-trigger {
+      order: 2;
+      margin-left: auto;
+    }
+    .difficulty-btns {
+      flex: 1 0 100%;
+      width: 100%;
+      justify-content: space-between;
+      order: 3;
     }
     .diff-btn {
       flex: 1;
@@ -757,7 +854,7 @@
       flex-direction: column;
       gap: var(--mobile-stack-gap);
     }
-    #hud-left { width: 100%; }
+    #hud-left { display: none; }
     #clock-card {
       width: 100%;
       padding: 10px 11px;
@@ -784,10 +881,6 @@
       padding: 12px;
       border-radius: 16px;
       background: linear-gradient(180deg, rgba(10,10,10,0.9), rgba(10,10,10,0.68));
-    }
-    #score-card {
-      width: 100%;
-      justify-content: space-between;
     }
     #tournament-card {
       top: 108px;
@@ -853,12 +946,27 @@
       gap: 8px;
     }
     #topbar .logo { font-size: 0.78rem; letter-spacing: 1.2px; }
+    .topbar-brand { align-items: center; }
+    .mobile-topbar-clock { gap: 4px; }
+    .mobile-clock-pill {
+      min-width: 52px;
+      padding: 5px 7px;
+      border-radius: 9px;
+    }
+    .mobile-clock-side { font-size: 0.46rem; }
+    .mobile-clock-time { font-size: 0.72rem; }
     #topbar .status { font-size: 0.78rem; }
     .topbar-actions {
       align-items: stretch;
       gap: 8px;
       flex-wrap: wrap;
     }
+    .mobile-topbar-score {
+      gap: 6px;
+      padding: 4px 8px;
+    }
+    .mobile-score-label { font-size: 0.5rem; }
+    .mobile-score-value { font-size: 0.82rem; }
     .topbar-link-btn {
       font-size: 0.74rem;
       white-space: nowrap;
@@ -936,7 +1044,19 @@
 
 <!-- TOP BAR -->
 <div id="topbar">
-  <div class="logo">♔ Шахматы</div>
+  <div class="topbar-brand">
+    <div class="logo">♔ Шахматы</div>
+    <div class="mobile-topbar-clock" aria-hidden="true">
+      <div class="mobile-clock-pill" id="mobile-clock-white-box">
+        <span class="mobile-clock-side">Б</span>
+        <span class="mobile-clock-time" id="mobile-clock-white">05:00</span>
+      </div>
+      <div class="mobile-clock-pill" id="mobile-clock-black-box">
+        <span class="mobile-clock-side">Ч</span>
+        <span class="mobile-clock-time" id="mobile-clock-black">05:00</span>
+      </div>
+    </div>
+  </div>
   <div class="status" id="status-text">Ваш ход</div>
   <div class="topbar-actions">
     <div class="mode-btns">
@@ -954,6 +1074,17 @@
           <path d="M10 14l-3 3 3 3"></path>
         </svg>
       </button>
+    </div>
+    <div class="mobile-topbar-score" aria-hidden="true">
+      <div class="mobile-score-side">
+        <span class="mobile-score-label">Игрок</span>
+        <span class="mobile-score-value" id="mobile-player-score">0</span>
+      </div>
+      <span class="mobile-score-divider">:</span>
+      <div class="mobile-score-side">
+        <span class="mobile-score-label">ИИ</span>
+        <span class="mobile-score-value" id="mobile-ai-score">0</span>
+      </div>
     </div>
     <button class="topbar-link-btn" id="tournament-menu-trigger" type="button" onclick="toggleTournamentInfo()">
       Турнирный режим
@@ -2418,8 +2549,8 @@ function getDefaultCameraState() {
 
 function updateCamera() {
   const isMobile = window.innerWidth <= 768;
-  const minRadius = chessGame.boardLocked ? (isMobile ? 7.2 : 6.2) : (isMobile ? 4.2 : 5);
-  const maxRadius = chessGame.boardLocked ? (isMobile ? 17 : 14) : (isMobile ? 24 : 18);
+  const minRadius = chessGame.boardLocked ? (isMobile ? 5.8 : 5.6) : (isMobile ? 4.2 : 5);
+  const maxRadius = chessGame.boardLocked ? (isMobile ? 23.5 : 18.5) : (isMobile ? 24 : 18);
   camRadius = Math.max(minRadius, Math.min(maxRadius, camRadius));
   const minPhi = chessGame.boardLocked ? 0.08 : 0.3;
   const maxPhi = chessGame.boardLocked ? 0.24 : Math.PI/2.1;
@@ -3058,6 +3189,8 @@ function getPlayerTurnStatus() {
 function updateScoreDisplay() {
   document.getElementById('player-score').textContent = chessGame.scores.player;
   document.getElementById('ai-score').textContent = chessGame.scores.ai;
+  document.getElementById('mobile-player-score').textContent = chessGame.scores.player;
+  document.getElementById('mobile-ai-score').textContent = chessGame.scores.ai;
 }
 
 function updateTournamentInfoVisibility() {
@@ -3097,13 +3230,21 @@ function updateTournamentDisplay() {
   document.getElementById('tournament-toggle').checked = tournamentActive;
   document.getElementById('clock-white').textContent = formatClock(chessGame.clocks[WHITE]);
   document.getElementById('clock-black').textContent = formatClock(chessGame.clocks[BLACK]);
+  document.getElementById('mobile-clock-white').textContent = formatClock(chessGame.clocks[WHITE]);
+  document.getElementById('mobile-clock-black').textContent = formatClock(chessGame.clocks[BLACK]);
 
   const whiteBox = document.getElementById('clock-white-box');
   const blackBox = document.getElementById('clock-black-box');
+  const mobileWhiteBox = document.getElementById('mobile-clock-white-box');
+  const mobileBlackBox = document.getElementById('mobile-clock-black-box');
   whiteBox.classList.toggle('active', clockActive && chessGame.engine.turn===WHITE && !isGameOverFlag);
   blackBox.classList.toggle('active', clockActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
   whiteBox.classList.toggle('tournament-off', !clockActive);
   blackBox.classList.toggle('tournament-off', !clockActive);
+  mobileWhiteBox.classList.toggle('active', clockActive && chessGame.engine.turn===WHITE && !isGameOverFlag);
+  mobileBlackBox.classList.toggle('active', clockActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
+  mobileWhiteBox.classList.toggle('tournament-off', !clockActive);
+  mobileBlackBox.classList.toggle('tournament-off', !clockActive);
   updateSideLabels();
   updateTournamentInfoVisibility();
 }
