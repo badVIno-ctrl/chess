@@ -6,8 +6,8 @@ const BOARD_RANKS = '87654321';
 const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const CHECKMATE_SCORE = 100000;
 const QUIESCENCE_CAP_DEPTH = 10;
-const SEARCH_LIMITS = { easy: 0, medium: 340, hard: 16000 };
-const HARD_MAX_DEPTH = 12;
+const SEARCH_LIMITS = { easy: 0, medium: 650, hard: 6200 };
+const HARD_MAX_DEPTH = 15;
 const ASPIRATION_WINDOW = 55;
 const TT_EXACT = 0;
 const TT_LOWER = 1;
@@ -463,10 +463,10 @@ function evaluateKingShelter(engine, color) {
     if(file < 0 || file > 7) continue;
     const frontRow = kingPos.r - dir;
     const nearPawn = engine.getPiece(frontRow, file);
-    if(nearPawn && nearPawn.type==='p' && nearPawn.color===color) score += 10;
-    else score -= 10;
+    if(nearPawn && nearPawn.type==='p' && nearPawn.color===color) score += 12;
+    else score -= 14;
   }
-  if(kingPos.c===6 || kingPos.c===2) score += 18;
+  if(kingPos.c===6 || kingPos.c===2) score += 24;
   return score;
 }
 
@@ -482,8 +482,8 @@ function evaluatePiecePressure(engine, color) {
 
     const defended = engine.isSquareAttacked(r, c, color);
     const value = PIECE_VALUES[piece.type] || 0;
-    if(!defended) penalty += Math.round(value * 0.22);
-    else penalty += Math.round(value * 0.08);
+    if(!defended) penalty += Math.round(value * 0.3);
+    else penalty += Math.round(value * 0.11);
   }
 
   return penalty;
@@ -518,8 +518,8 @@ function evaluateHangingPieces(engine, color) {
     if(!engine.isSquareAttacked(r, c, enemy)) continue;
     const defended = engine.isSquareAttacked(r, c, color);
     const value = PIECE_VALUES[piece.type] || 0;
-    if(!defended) penalty += Math.round(value * 0.42);
-    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.12);
+    if(!defended) penalty += Math.round(value * 0.5);
+    else if(piece.type==='q' || piece.type==='r') penalty += Math.round(value * 0.16);
   }
   return penalty;
 }
@@ -656,7 +656,7 @@ function isQuietMove(engine, move) {
 function tacticalBlunderPenalty(engine, side) {
   const enemy = engine.turn;
   let maxPenalty = 0;
-  const enemyMoves = orderedMoves(engine, enemy).slice(0, 18);
+  const enemyMoves = orderedMoves(engine, enemy).slice(0, 24);
 
   for(const move of enemyMoves) {
     const captured = getCapturePiece(engine, move);
@@ -665,13 +665,14 @@ function tacticalBlunderPenalty(engine, side) {
 
     const victimVal = PIECE_VALUES[captured.type] || 0;
     const attackerVal = PIECE_VALUES[attacker.type] || 0;
-    let penalty = victimVal - Math.round(attackerVal * 0.35);
+    let penalty = victimVal - Math.round(attackerVal * 0.28);
 
-    if(captured.type==='q') penalty += 900;
-    else if(captured.type==='r') penalty += 220;
-    else if(captured.type==='b' || captured.type==='n') penalty += 120;
+    if(captured.type==='q') penalty += 1100;
+    else if(captured.type==='r') penalty += 320;
+    else if(captured.type==='b' || captured.type==='n') penalty += 180;
+    else if(captured.type==='p') penalty += 40;
 
-    if(!engine.isSquareAttacked(move.to.r, move.to.c, side)) penalty += 90;
+    if(!engine.isSquareAttacked(move.to.r, move.to.c, side)) penalty += 140;
     maxPenalty = Math.max(maxPenalty, penalty);
   }
 
@@ -916,8 +917,7 @@ function pickHardMove(engine, side) {
 
 function getOpeningMove(engine, side) {
   const history = engine.moveHistory || [];
-  if(side!==BLACK) return null;
-  const book = {
+  const book = side===BLACK ? {
     '': ['1434','1232','1636','1545','1333'],
     '6444': ['1434','1232','1545'],
     '6343': ['1232','1434','1545'],
@@ -940,6 +940,19 @@ function getOpeningMove(engine, side) {
     '6343|6244|7152': ['0625'],
     '6242|7152': ['1232','0625'],
     '6242|7655': ['1232','0625']
+  } : {
+    '': ['6444','6343','6242','6646'],
+    '1434': ['7655','7152','6353'],
+    '1232': ['6444','7655','7152'],
+    '1636': ['6444','6343'],
+    '1545': ['6444','7655'],
+    '1434|1232': ['7152','7655','7542'],
+    '1434|1434': ['7152','7655'],
+    '1434|1636': ['7655','7152'],
+    '6444|1434': ['7655','7152','7542'],
+    '6343|1232': ['7152','7655'],
+    '6444|1232': ['7152','7655'],
+    '6242|1232': ['7152','7655']
   };
   const sequence = history.map(move => `${move.from.r}${move.from.c}${move.to.r}${move.to.c}`).join('|');
   const candidates = book[sequence];

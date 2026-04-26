@@ -47,7 +47,40 @@
     gap: 10px;
     margin-left: auto;
   }
+  .mode-btns { display: flex; align-items: center; gap: 6px; }
   .difficulty-btns { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(212,175,55,0.25);
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,244,190,0.22), transparent 48%),
+      linear-gradient(180deg, rgba(28,28,28,0.94), rgba(10,10,10,0.88));
+    color: var(--gold);
+    cursor: pointer;
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, color 0.22s ease;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.26), inset 0 0 14px rgba(212,175,55,0.04);
+  }
+  .icon-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(212,175,55,0.5);
+    color: var(--gold-light);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.32), 0 0 18px rgba(212,175,55,0.14);
+  }
+  .icon-btn.active {
+    color: #060606;
+    border-color: rgba(255,226,121,0.9);
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,0.45), transparent 42%),
+      linear-gradient(135deg, #f5d87a, #d4af37 58%, #8d6d10);
+    box-shadow: 0 0 24px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .icon-btn svg {
+    width: 17px; height: 17px;
+    stroke: currentColor; fill: none; stroke-width: 1.9;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
   .topbar-link-btn {
     background: transparent;
     border: none;
@@ -76,6 +109,12 @@
     position: fixed; top: 76px; left: 20px; right: 20px; z-index: 10;
     display: flex; align-items: stretch; justify-content: space-between;
     gap: 12px; pointer-events: none;
+  }
+  #hud-left {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(280px, 32vw);
   }
   .hud-card {
     pointer-events: auto;
@@ -106,7 +145,7 @@
     right: 20px;
     z-index: 24;
     display: flex; align-items: center; gap: 18px;
-    width: min(720px, calc(100vw - 40px));
+    width: min(560px, calc(100vw - 340px));
     opacity: 0;
     transform: translateY(-10px) scale(0.98);
     pointer-events: none;
@@ -181,22 +220,57 @@
   .switch input:checked + .slider::before { transform: translateX(25px); }
 
   #clock-card {
-    display: flex; align-items: center; gap: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  #clock-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at top left, rgba(212,175,55,0.18), transparent 42%),
+      linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+    pointer-events: none;
+  }
+  #clock-card .clock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+  .clock-title {
+    color: #f4dfa0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .clock-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
   }
   .clock-box {
     min-width: 92px;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 12px 13px;
+    border-radius: 16px;
     border: 1px solid rgba(212,175,55,0.18);
-    background: rgba(255,255,255,0.03);
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
     transition: all 0.25s ease;
   }
   .clock-box.active {
     border-color: rgba(212,175,55,0.75);
-    box-shadow: inset 0 0 20px rgba(212,175,55,0.08), 0 0 20px rgba(212,175,55,0.12);
-    transform: translateY(-1px);
+    box-shadow: inset 0 0 20px rgba(212,175,55,0.08), 0 0 24px rgba(212,175,55,0.16);
+    transform: translateY(-1px) scale(1.01);
   }
-  .clock-box.tournament-off { opacity: 0.45; }
+  .clock-box.tournament-off { opacity: 0.88; }
   .clock-side {
     color: #8A8A8A; font-size: 0.68rem; text-transform: uppercase;
     letter-spacing: 1.2px; margin-bottom: 4px;
@@ -204,6 +278,12 @@
   .clock-time {
     color: #F5F0D2; font-size: 1.15rem; font-weight: 700;
     font-variant-numeric: tabular-nums;
+  }
+  .clock-meta {
+    color: rgba(255,255,255,0.46);
+    font-size: 0.66rem;
+    margin-top: 3px;
+    letter-spacing: 0.4px;
   }
 
   .hidden-chat #chat-panel,
@@ -478,23 +558,108 @@
   /* GAME OVER */
   #gameover-overlay {
     position: fixed; inset: 0; z-index: 150;
-    background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+    background:
+      radial-gradient(circle at top, rgba(212,175,55,0.12), transparent 32%),
+      radial-gradient(circle at bottom, rgba(110,160,255,0.1), transparent 28%),
+      rgba(4,4,4,0.46);
+    backdrop-filter: blur(8px);
     display: none; align-items: center; justify-content: center;
   }
   #gameover-box {
-    background: rgba(12,12,12,0.98); border: 1px solid var(--gold);
-    border-radius: 16px; padding: 40px 50px; text-align: center;
-    box-shadow: 0 0 60px rgba(212,175,55,0.4);
-    max-width: 400px; width: 90%;
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(150deg, rgba(20,20,20,0.84), rgba(10,10,10,0.62)),
+      rgba(12,12,12,0.64);
+    border: 1px solid rgba(212,175,55,0.34);
+    border-radius: 24px;
+    padding: 32px 30px 24px;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.38), 0 0 60px rgba(212,175,55,0.14);
+    max-width: 430px;
+    width: min(92vw, 430px);
   }
-  #gameover-box h2 { color: var(--gold); font-size: 1.8rem; margin-bottom: 12px; letter-spacing: 3px; }
-  #gameover-box p { color: #AAA; margin-bottom: 28px; font-size: 0.9rem; }
+  #gameover-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,0.14), transparent 18%),
+      radial-gradient(circle at 85% 10%, rgba(212,175,55,0.14), transparent 18%),
+      linear-gradient(180deg, rgba(255,255,255,0.05), transparent 36%);
+    pointer-events: none;
+  }
+  .gameover-kicker {
+    position: relative;
+    color: rgba(244,223,160,0.74);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  #gameover-box h2 {
+    position: relative;
+    color: var(--gold);
+    font-size: 1.7rem;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+  #gameover-box p {
+    position: relative;
+    color: #d1d1d1;
+    margin-bottom: 18px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  .gameover-meta {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .gameover-stat {
+    padding: 11px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(212,175,55,0.16);
+    background: rgba(255,255,255,0.04);
+  }
+  .gameover-stat-label {
+    display: block;
+    color: #8e8e8e;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 4px;
+  }
+  .gameover-stat-value {
+    color: #f3ead0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .gameover-actions {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
   .go-btn {
     background: var(--gold); color: #000; border: none; padding: 12px 36px;
     border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 700;
     letter-spacing: 1px; transition: all 0.2s;
   }
   .go-btn:hover { background: var(--gold-light); box-shadow: 0 0 25px rgba(212,175,55,0.6); }
+  .go-btn.ghost {
+    background: rgba(255,255,255,0.04);
+    color: var(--gold);
+    border: 1px solid rgba(212,175,55,0.26);
+  }
+  .go-btn.ghost:hover {
+    background: rgba(212,175,55,0.08);
+    box-shadow: 0 0 20px rgba(212,175,55,0.18);
+  }
 
   /* LOADING */
   #loading {
@@ -572,10 +737,11 @@
       order: 2;
       margin-left: 0;
     }
+    .mode-btns { order: 0; }
     .difficulty-btns {
       flex: 1;
       justify-content: space-between;
-      order: 0;
+      order: 1;
     }
     .diff-btn {
       flex: 1;
@@ -590,6 +756,29 @@
       right: 12px;
       flex-direction: column;
       gap: var(--mobile-stack-gap);
+    }
+    #hud-left { width: 100%; }
+    #clock-card {
+      width: 100%;
+      padding: 10px 11px;
+    }
+    .clock-title {
+      font-size: 0.72rem;
+      letter-spacing: 0.8px;
+    }
+    .clock-stack { gap: 6px; }
+    .clock-box {
+      padding: 8px 10px;
+      border-radius: 12px;
+    }
+    .clock-side {
+      font-size: 0.58rem;
+      margin-bottom: 2px;
+    }
+    .clock-time { font-size: 0.92rem; }
+    .clock-meta {
+      font-size: 0.58rem;
+      margin-top: 2px;
     }
     .hud-card {
       padding: 12px;
@@ -613,17 +802,6 @@
     .tournament-copy { flex: 1 1 140px; }
     .tournament-copy-head { align-items: flex-start; }
     .tournament-close-btn { padding: 5px 9px; }
-    #clock-card {
-      width: 100%;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .clock-box {
-      flex: 1;
-      min-width: 0;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.04);
-    }
     #action-btns {
       left: 12px;
       right: 12px;
@@ -679,6 +857,7 @@
     .topbar-actions {
       align-items: stretch;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .topbar-link-btn {
       font-size: 0.74rem;
@@ -698,8 +877,14 @@
     }
     #score-card { gap: 12px; }
     .score-value { font-size: 1.05rem; }
-    .clock-box { padding: 8px 10px; }
-    .clock-time { font-size: 1rem; }
+    #clock-card {
+      padding: 8px 9px;
+    }
+    .clock-box { padding: 6px 8px; }
+    .clock-time { font-size: 0.82rem; }
+    .clock-side,
+    .clock-meta { font-size: 0.54rem; }
+    .gameover-meta { grid-template-columns: 1fr; }
     #action-btns {
       gap: 6px;
       grid-template-columns: 1fr;
@@ -754,6 +939,22 @@
   <div class="logo">♔ Шахматы</div>
   <div class="status" id="status-text">Ваш ход</div>
   <div class="topbar-actions">
+    <div class="mode-btns">
+      <button class="icon-btn" id="view-lock-btn" type="button" onclick="toggleBoardLock()" title="Фиксировать вид сверху" aria-label="Фиксировать вид сверху">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="9" rx="2"></rect>
+          <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="side-switch-btn" type="button" onclick="togglePlayerSide()" title="Сменить сторону" aria-label="Сменить сторону">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 7h10"></path>
+          <path d="M14 4l3 3-3 3"></path>
+          <path d="M17 17H7"></path>
+          <path d="M10 14l-3 3 3 3"></path>
+        </svg>
+      </button>
+    </div>
     <button class="topbar-link-btn" id="tournament-menu-trigger" type="button" onclick="toggleTournamentInfo()">
       Турнирный режим
     </button>
@@ -766,15 +967,34 @@
 </div>
 
 <div id="hud-panel">
-  <div class="hud-card" id="score-card">
-    <div class="score-block">
-      <span class="score-label">Игрок</span>
-      <span class="score-value" id="player-score">0</span>
+  <div id="hud-left">
+    <div class="hud-card" id="clock-card">
+      <div class="clock-head">
+        <div class="clock-title">Шахматные часы</div>
+      </div>
+      <div class="clock-stack">
+        <div class="clock-box" id="clock-white-box">
+          <div class="clock-side" id="clock-white-side">Белые</div>
+          <div class="clock-time" id="clock-white">05:00</div>
+          <div class="clock-meta" id="clock-white-meta">Игрок</div>
+        </div>
+        <div class="clock-box" id="clock-black-box">
+          <div class="clock-side" id="clock-black-side">Чёрные</div>
+          <div class="clock-time" id="clock-black">05:00</div>
+          <div class="clock-meta" id="clock-black-meta">ИИ</div>
+        </div>
+      </div>
     </div>
-    <div class="score-divider">:</div>
-    <div class="score-block">
-      <span class="score-label">ИИ</span>
-      <span class="score-value" id="ai-score">0</span>
+    <div class="hud-card" id="score-card">
+      <div class="score-block">
+        <span class="score-label">Игрок</span>
+        <span class="score-value" id="player-score">0</span>
+      </div>
+      <div class="score-divider">:</div>
+      <div class="score-block">
+        <span class="score-label">ИИ</span>
+        <span class="score-value" id="ai-score">0</span>
+      </div>
     </div>
   </div>
   <div class="hud-card" id="tournament-card">
@@ -792,16 +1012,6 @@
       <input type="checkbox" id="tournament-toggle" onchange="toggleTournamentMode(this.checked)">
       <span class="slider"></span>
     </label>
-    <div id="clock-card">
-      <div class="clock-box" id="clock-white-box">
-        <div class="clock-side">Игрок</div>
-        <div class="clock-time" id="clock-white">05:00</div>
-      </div>
-      <div class="clock-box" id="clock-black-box">
-        <div class="clock-side">ИИ</div>
-        <div class="clock-time" id="clock-black">05:00</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -862,9 +1072,27 @@
 <!-- GAME OVER -->
 <div id="gameover-overlay">
   <div id="gameover-box">
+    <div class="gameover-kicker">Партия завершена</div>
     <h2 id="go-title">МАТ!</h2>
     <p id="go-desc">Игра завершена</p>
-    <button class="go-btn" onclick="newGame()">Новая игра</button>
+    <div class="gameover-meta">
+      <div class="gameover-stat">
+        <span class="gameover-stat-label">Результат</span>
+        <span class="gameover-stat-value" id="go-result">1-0</span>
+      </div>
+      <div class="gameover-stat">
+        <span class="gameover-stat-label">Ходов</span>
+        <span class="gameover-stat-value" id="go-moves">0</span>
+      </div>
+      <div class="gameover-stat">
+        <span class="gameover-stat-label">Вы играли</span>
+        <span class="gameover-stat-value" id="go-side">Белыми</span>
+      </div>
+    </div>
+    <div class="gameover-actions">
+      <button class="go-btn" onclick="newGame()">Новая игра</button>
+      <button class="go-btn ghost" type="button" onclick="closeGameOverModal()">Оставить на экране</button>
+    </div>
   </div>
 </div>
 
@@ -893,7 +1121,6 @@
 const PIECES = { PAWN:'p', ROOK:'r', KNIGHT:'n', BISHOP:'b', QUEEN:'q', KING:'k' };
 const WHITE = 'w', BLACK = 'b';
 const TOURNAMENT_INITIAL_MS = 5 * 60 * 1000;
-const TOURNAMENT_INCREMENT_MS = 3000;
 const PROMOTION_TYPES = ['q', 'r', 'b', 'n'];
 const TUTORIAL_STORAGE_KEY = 'chess_start_tutorial';
 const BOARD_FILES = 'abcdefgh';
@@ -1225,9 +1452,9 @@ const PST = {
 
 const CHECKMATE_SCORE = 100000;
 const QUIESCENCE_CAP_DEPTH = 6;
-const HARD_MIN_THINK_MS = 1600;
-const HARD_MAX_THINK_MS = 5200;
-const HARD_FALLBACK_MAX_DEPTH = 8;
+const HARD_MIN_THINK_MS = 2600;
+const HARD_MAX_THINK_MS = 7600;
+const HARD_FALLBACK_MAX_DEPTH = 10;
 const ASPIRATION_WINDOW = 55;
 
 function mirrorRowForColor(row, color) {
@@ -1552,29 +1779,36 @@ function negamax(engine, depth, alpha, beta, ply, ctx) {
   return bestScore;
 }
 
-function openingReplyHard(engine) {
-  // Simple opening repertoire as black for stronger early game stability.
+function openingReplyHard(engine, side) {
+  // Simple opening repertoire when the fallback engine answers the first move.
   const h = engine.moveHistory;
-  if(h.length!==1 || engine.turn!==BLACK) return null;
-  const wm = h[0];
-  const from = `${wm.from.r}${wm.from.c}`;
-  const to = `${wm.to.r}${wm.to.c}`;
-  const whiteMove = `${from}-${to}`;
-  const replies = {
-    '64-44': {fr:1,fc:4,tr:3,tc:4}, // 1.e4 -> ...e5
-    '63-43': {fr:1,fc:3,tr:3,tc:3}, // 1.d4 -> ...d5
-    '62-42': {fr:1,fc:2,tr:3,tc:2}, // 1.c4 -> ...c5
-    '66-46': {fr:1,fc:6,tr:3,tc:6}, // 1.g4 -> ...g5
-    '61-41': {fr:1,fc:2,tr:2,tc:2}  // 1.b4 -> ...c6
+  if(h.length!==1 || engine.turn!==side) return null;
+  const firstMove = h[0];
+  const from = `${firstMove.from.r}${firstMove.from.c}`;
+  const to = `${firstMove.to.r}${firstMove.to.c}`;
+  const replyKey = `${from}-${to}`;
+  const replies = side===BLACK ? {
+    '64-44': {fr:1,fc:4,tr:3,tc:4},
+    '63-43': {fr:1,fc:3,tr:3,tc:3},
+    '62-42': {fr:1,fc:2,tr:3,tc:2},
+    '66-46': {fr:1,fc:6,tr:3,tc:6},
+    '61-41': {fr:1,fc:2,tr:2,tc:2}
+  } : {
+    '14-34': {fr:6,fc:4,tr:4,tc:4},
+    '13-33': {fr:6,fc:3,tr:4,tc:3},
+    '12-32': {fr:6,fc:2,tr:4,tc:2},
+    '16-36': {fr:6,fc:6,tr:4,tc:6},
+    '11-31': {fr:6,fc:1,tr:5,tc:2}
   };
-  const rep = replies[whiteMove];
+  const rep = replies[replyKey];
   if(!rep) return null;
-  const legal = engine.getAllLegalMoves(BLACK);
+  const legal = engine.getAllLegalMoves(side);
   return legal.find(m=>m.from.r===rep.fr&&m.from.c===rep.fc&&m.to.r===rep.tr&&m.to.c===rep.tc) || null;
 }
 
 function getBestMoveByDifficulty(engine, difficulty) {
-  const legal = engine.getAllLegalMoves(BLACK);
+  const aiSide = engine.turn;
+  const legal = engine.getAllLegalMoves(aiSide);
   if(!legal.length) return null;
 
   if(difficulty==='easy') {
@@ -1583,7 +1817,7 @@ function getBestMoveByDifficulty(engine, difficulty) {
       const s = evaluateBoard(engine);
       engine.undoMove();
       return {m,s};
-    }).sort((a,b)=>a.s-b.s); // lower score better for black
+    }).sort((a,b)=> aiSide===BLACK ? a.s-b.s : b.s-a.s);
     const take = Math.min(4, scored.length);
     const idx = Math.floor(Math.random()*take);
     return scored[idx].m;
@@ -1617,7 +1851,7 @@ function getBestMoveByDifficulty(engine, difficulty) {
         for(const reply of enemyMoves) {
           const captured = getCapturePiece(engine, reply);
           const attacker = engine.getPiece(reply.from.r, reply.from.c);
-          if(!captured || !attacker || captured.color!==BLACK) continue;
+          if(!captured || !attacker || captured.color!==aiSide) continue;
           extraPenalty = Math.max(extraPenalty, (PIECE_VALUES[captured.type] || 0) - Math.round((PIECE_VALUES[attacker.type] || 0) * 0.35));
         }
         val += extraPenalty;
@@ -1628,7 +1862,7 @@ function getBestMoveByDifficulty(engine, difficulty) {
     return best || legal[0];
   }
 
-  const openingMove = openingReplyHard(engine);
+  const openingMove = openingReplyHard(engine, aiSide);
   if(openingMove) return openingMove;
 
   const ctx = {
@@ -1732,9 +1966,12 @@ let tutorialSequenceToken = 0;
 let tutorialStepResolver = null;
 let hasManualCameraControl = false;
 let tutorialCameraAnimId = null;
+let pendingAIMoveTimeout = null;
+let aiMoveRequestToken = 0;
 const SQUARE_SIZE = 1, BOARD_OFFSET = 3.5;
 
 function initThree() {
+  const isMobileViewport = window.innerWidth <= 768;
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x070707);
   scene.fog = new THREE.FogExp2(0x070707, 0.05);
@@ -1747,7 +1984,7 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileViewport ? 1.25 : 1.8));
   document.getElementById('canvas-container').appendChild(renderer.domElement);
 
   raycaster = new THREE.Raycaster();
@@ -1760,7 +1997,7 @@ function initThree() {
   const mainLight = new THREE.DirectionalLight(0xFFD700, 1.5);
   mainLight.position.set(5, 12, 5);
   mainLight.castShadow = true;
-  mainLight.shadow.mapSize.set(2048, 2048);
+  mainLight.shadow.mapSize.set(isMobileViewport ? 1024 : 2048, isMobileViewport ? 1024 : 2048);
   scene.add(mainLight);
 
   const fillLight = new THREE.PointLight(0xFFAA00, 0.8, 30);
@@ -1851,24 +2088,36 @@ function createBoardLabelSprite(text) {
 }
 
 function addBoardCoordinates() {
+  const edgeOffset = BOARD_OFFSET + 0.72;
   for(let i=0; i<8; i++) {
     const fileLabel = createBoardLabelSprite(BOARD_FILES[i]);
     if(fileLabel) {
-      fileLabel.position.set(i - BOARD_OFFSET, 0.16, BOARD_OFFSET + 0.8);
+      fileLabel.position.set(i - BOARD_OFFSET, 0.16, edgeOffset);
       boardGroup.add(fileLabel);
+    }
+    const topFileLabel = createBoardLabelSprite(BOARD_FILES[i]);
+    if(topFileLabel) {
+      topFileLabel.position.set(i - BOARD_OFFSET, 0.16, -edgeOffset);
+      boardGroup.add(topFileLabel);
     }
     const rankLabel = createBoardLabelSprite(BOARD_RANKS[i]);
     if(rankLabel) {
-      rankLabel.position.set(-BOARD_OFFSET - 0.8, 0.16, i - BOARD_OFFSET);
+      rankLabel.position.set(-edgeOffset, 0.16, i - BOARD_OFFSET);
       boardGroup.add(rankLabel);
+    }
+    const rightRankLabel = createBoardLabelSprite(BOARD_RANKS[i]);
+    if(rightRankLabel) {
+      rightRankLabel.position.set(edgeOffset, 0.16, i - BOARD_OFFSET);
+      boardGroup.add(rightRankLabel);
     }
   }
 }
 
 function addParticles() {
+  const isMobileViewport = window.innerWidth <= 768;
   // Gold dust particles near board
   const geo = new THREE.BufferGeometry();
-  const count = 300;
+  const count = isMobileViewport ? 140 : 300;
   const pos = new Float32Array(count*3);
   const sizes = new Float32Array(count);
   for(let i=0;i<count;i++) {
@@ -1885,7 +2134,7 @@ function addParticles() {
 
   // Starfield far away
   const starGeo = new THREE.BufferGeometry();
-  const starCount=500;
+  const starCount = isMobileViewport ? 220 : 500;
   const starPos=new Float32Array(starCount*3);
   for(let i=0;i<starCount*3;i+=3){
     starPos[i]=(Math.random()-0.5)*80;
@@ -2077,6 +2326,22 @@ function renderBoard() {
   updateCapturedDisplay();
 }
 
+function getPlayerSide() {
+  return chessGame.playerSide || WHITE;
+}
+
+function getAISide() {
+  return getPlayerSide()===WHITE ? BLACK : WHITE;
+}
+
+function isPlayerTurn() {
+  return chessGame.engine.turn===getPlayerSide();
+}
+
+function isAITurn() {
+  return chessGame.engine.turn===getAISide();
+}
+
 function renderHighlights() {
   // Remove old highlights
   highlightObjects.forEach(h => boardGroup.remove(h));
@@ -2139,12 +2404,29 @@ function setupCameraControls() {
   el.addEventListener('touchend', onTouchEnd);
 }
 
+function getDefaultCameraState() {
+  const isMobile = window.innerWidth <= 768;
+  const isPortrait = window.innerHeight >= window.innerWidth;
+  const theta = getPlayerSide()===WHITE ? 0 : Math.PI;
+  if(chessGame.boardLocked) {
+    return { theta, phi: 0.12, radius: isMobile ? 10.6 : 9.1 };
+  }
+  if(isMobile && isPortrait) return { theta, phi: 1.16, radius: 13.6 };
+  if(isMobile) return { theta, phi: 1.04, radius: 12.2 };
+  return { theta, phi: Math.PI / 3.5, radius: 11 };
+}
+
 function updateCamera() {
   const isMobile = window.innerWidth <= 768;
-  const minRadius = isMobile ? 4.2 : 5;
-  const maxRadius = isMobile ? 24 : 18;
+  const minRadius = chessGame.boardLocked ? (isMobile ? 7.2 : 6.2) : (isMobile ? 4.2 : 5);
+  const maxRadius = chessGame.boardLocked ? (isMobile ? 17 : 14) : (isMobile ? 24 : 18);
   camRadius = Math.max(minRadius, Math.min(maxRadius, camRadius));
-  camPhi = Math.max(0.3, Math.min(Math.PI/2.1, camPhi));
+  const minPhi = chessGame.boardLocked ? 0.08 : 0.3;
+  const maxPhi = chessGame.boardLocked ? 0.24 : Math.PI/2.1;
+  camPhi = Math.max(minPhi, Math.min(maxPhi, camPhi));
+  if(chessGame.boardLocked) {
+    camTheta = getPlayerSide()===WHITE ? 0 : Math.PI;
+  }
   camera.position.x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
   camera.position.y = camRadius * Math.cos(camPhi);
   camera.position.z = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
@@ -2193,30 +2475,21 @@ function focusCameraOnSquares(squares) {
 
 function applyResponsiveCameraPreset(force=false) {
   if(hasManualCameraControl && !force) return;
-  const isMobile = window.innerWidth <= 768;
-  const isPortrait = window.innerHeight >= window.innerWidth;
-  if(isMobile && isPortrait) {
-    camTheta = 0;
-    camPhi = 1.16;
-    camRadius = 13.6;
-  } else if(isMobile) {
-    camTheta = 0;
-    camPhi = 1.04;
-    camRadius = 12.2;
-  } else {
-    camTheta = 0;
-    camPhi = Math.PI / 3.5;
-    camRadius = 11;
-  }
+  const preset = getDefaultCameraState();
+  camTheta = preset.theta;
+  camPhi = preset.phi;
+  camRadius = preset.radius;
   updateCamera();
 }
 
 let rightClickStart = false;
 function onMouseDown(e) {
+  if(chessGame.boardLocked) return;
   if(e.button===2) { isDragging=true; lastMouse={x:e.clientX,y:e.clientY}; rightClickStart=true; return; }
   rightClickStart=false;
 }
 function onMouseMove(e) {
+  if(chessGame.boardLocked) return;
   if(isDragging&&rightClickStart) {
     const dx=(e.clientX-lastMouse.x)*0.005;
     const dy=(e.clientY-lastMouse.y)*0.005;
@@ -2243,6 +2516,11 @@ function onTouchStart(e) {
     pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     isDragging=false; touchStartPos=null; return;
   }
+  if(chessGame.boardLocked) {
+    touchStartPos={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    touchStartTime=Date.now();
+    return;
+  }
   touchStartPos={x:e.touches[0].clientX,y:e.touches[0].clientY};
   touchStartTime=Date.now();
   lastMouse={x:e.touches[0].clientX,y:e.touches[0].clientY};
@@ -2253,6 +2531,7 @@ function onTouchMove(e) {
     const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     camRadius-=(d-pinchDist)*0.065; hasManualCameraControl = true; updateCamera(); pinchDist=d; return;
   }
+  if(chessGame.boardLocked) return;
   if(!touchStartPos) return;
   const dx=e.touches[0].clientX-lastMouse.x, dy=e.touches[0].clientY-lastMouse.y;
   const dist=Math.hypot(e.touches[0].clientX-touchStartPos.x,e.touches[0].clientY-touchStartPos.y);
@@ -2276,7 +2555,7 @@ function onTouchEnd(e) {
 }
 
 function handleClick(e) {
-  if(isAnimating||chessGame.engine.turn!==WHITE) return;
+  if(isAnimating||!isPlayerTurn()) return;
   if(chessGame.tutorialLocked) return;
   if(document.getElementById('gameover-overlay').style.display==='flex') return;
 
@@ -2312,7 +2591,7 @@ function handleClick(e) {
 
   // Select piece
   const piece = chessGame.engine.getPiece(r,c);
-  if(piece&&piece.color===WHITE&&chessGame.engine.turn===WHITE) {
+  if(piece&&piece.color===getPlayerSide()&&isPlayerTurn()) {
     selectedSquare={r,c};
     legalMovesCache = chessGame.engine.getLegalMoves(r,c);
     renderHighlights();
@@ -2418,6 +2697,24 @@ function flashAndRemove(mesh) {
 let isGameOverFlag = false;
 function isGameOver() { return isGameOverFlag; }
 
+function cancelPendingAIMove() {
+  if(pendingAIMoveTimeout) {
+    clearTimeout(pendingAIMoveTimeout);
+    pendingAIMoveTimeout = null;
+  }
+  aiMoveRequestToken += 1;
+}
+
+function scheduleAIMove(delay=200) {
+  cancelPendingAIMove();
+  if(isGameOverFlag || isAnimating || !isAITurn()) return;
+  const token = aiMoveRequestToken;
+  pendingAIMoveTimeout = setTimeout(() => {
+    pendingAIMoveTimeout = null;
+    doAIMove(token);
+  }, delay);
+}
+
 function performAIMove(best, options={}) {
   if(!best || isGameOverFlag) return;
 
@@ -2431,21 +2728,20 @@ function performAIMove(best, options={}) {
   stopTournamentClock();
 
   const finalizeMove = () => {
-    const clockBeforeMove = { ...chessGame.clocks };
-    engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to,forcePromotion);
-    if(chessGame.tournamentMode) {
-      chessGame.clocks = clockBeforeMove;
-      saveClockSnapshot();
-      applyTournamentIncrement(BLACK);
+    if(!isAITurn()) {
+      isAnimating = false;
+      return;
     }
+    engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to,forcePromotion);
+    saveClockSnapshot();
     lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
     renderBoard();
     saveGame();
     isAnimating=false;
-    setStatus('Ваш ход');
+    setStatus(getPlayerTurnStatus());
     checkGameState();
     syncTournamentClock();
-    if(chessGame.trainingMatch && !isGameOverFlag && engine.turn===WHITE) requestTutorialHint(true);
+    if(chessGame.trainingMatch && !isGameOverFlag && isPlayerTurn()) requestTutorialHint(true);
     if(!isGameOverFlag && !skipComment && piece) getAIComment(best, piece);
   };
 
@@ -2455,38 +2751,23 @@ function performAIMove(best, options={}) {
   else finalizeMove();
 }
 
-async function doAIMove() {
-  if(isGameOverFlag) return;
+async function doAIMove(expectedToken=aiMoveRequestToken) {
+  if(isGameOverFlag || expectedToken!==aiMoveRequestToken || !isAITurn()) return;
   setStatus('ИИ думает...');
-  const engine=chessGame.engine;
-  const waitMs = chessGame.difficulty==='hard' ? 220 : 140;
+  const waitMs = chessGame.difficulty==='hard' ? 140 : 90;
   await new Promise(r=>setTimeout(r,waitMs));
-  const best=getBestMoveByDifficulty(engine,chessGame.difficulty);
-  if(!best) { checkGameState(); return; }
-
-  const fromMesh=pieceObjects[`${best.from.r},${best.from.c}`];
-  const targetPos=squareToWorld(best.to.r,best.to.c);
-  const piece=engine.getPiece(best.from.r,best.from.c);
-
-  isAnimating=true;
-  if(fromMesh) {
-    animatePiece(fromMesh, targetPos, 500, ()=>{
-      engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to);
-      lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
-      renderBoard(); saveGame();
-      isAnimating=false;
-      setStatus('Ваш ход');
-      checkGameState();
-      if(!isGameOverFlag) getAIComment(best, piece);
-    });
-  } else {
-    engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to);
-    lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
-    renderBoard(); saveGame();
-    isAnimating=false;
-    setStatus('Ваш ход');
-    checkGameState();
-    if(!isGameOverFlag) getAIComment(best, piece);
+  if(isGameOverFlag || expectedToken!==aiMoveRequestToken || !isAITurn()) return;
+  try {
+    const response = await requestHelper('bestMove', { difficulty: chessGame.trainingMatch ? 'easy' : chessGame.difficulty });
+    if(isGameOverFlag || expectedToken!==aiMoveRequestToken || !isAITurn()) return;
+    const best = response.move;
+    if(!best) { checkGameState(); return; }
+    performAIMove(best);
+  } catch(e) {
+    if(isGameOverFlag || expectedToken!==aiMoveRequestToken || !isAITurn()) return;
+    const fallback = getBestMoveByDifficulty(chessGame.engine, chessGame.trainingMatch ? 'easy' : chessGame.difficulty);
+    if(!fallback) { checkGameState(); return; }
+    performAIMove(fallback);
   }
 }
 
@@ -2519,7 +2800,17 @@ function checkGameState() {
 function showGameOver(title, desc) {
   document.getElementById('go-title').textContent=title;
   document.getElementById('go-desc').textContent=desc;
+  document.getElementById('go-moves').textContent = String(Math.ceil(chessGame.engine.moveHistory.length / 2));
+  document.getElementById('go-side').textContent = getPlayerSide()===WHITE ? 'Белыми' : 'Чёрными';
+  const result = title.includes('НИЧЬ') || title.includes('ПАТ')
+    ? '1/2-1/2'
+    : chessGame.engine.turn===getPlayerSide() ? '0-1' : '1-0';
+  document.getElementById('go-result').textContent = result;
   document.getElementById('gameover-overlay').style.display='flex';
+}
+
+function closeGameOverModal() {
+  document.getElementById('gameover-overlay').style.display='none';
 }
 
 function setStatus(txt) {
@@ -2574,7 +2865,7 @@ function requestHelper(action, extra={}) {
   }
 
   const requestId = `helper-${++helperRequestSeq}`;
-  const bestMoveTimeout = extra.difficulty==='hard' ? 11000 : 1800;
+  const bestMoveTimeout = extra.difficulty==='hard' ? 7600 : 2200;
   const timeoutMs = action==='bestMove' ? bestMoveTimeout : 2500;
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -2686,7 +2977,7 @@ async function playTutorialIntro() {
 }
 
 async function requestTutorialHint(forceOpen=false) {
-  if(!chessGame.trainingMatch || chessGame.engine.turn!==WHITE) return;
+  if(!chessGame.trainingMatch || !isPlayerTurn()) return;
   try {
     const hint = await requestHelper('tutorialHint');
     chessGame.tutorialSuggestion = hint.move || null;
@@ -2718,8 +3009,12 @@ function startTrainingMatch() {
   chessGame.tutorialLocked = true;
   chessGame.tutorialAwaitingConfirm = false;
   chessGame.difficulty = 'easy';
+  chessGame.playerSide = WHITE;
+  hasManualCameraControl = false;
   document.querySelectorAll('.diff-btn').forEach(btn=>btn.classList.remove('active'));
   document.getElementById('btn-easy').classList.add('active');
+  updateSideLabels();
+  applyResponsiveCameraPreset(true);
   newGame({ preserveTraining: true, silent: true });
   showTutorialPanel('Сейчас быстро покажу ключевые фигуры, а потом проведу вас через первые полезные ходы <strong>без лишней теории</strong>.');
   setTimeout(()=>playTutorialIntro(), 250);
@@ -2742,6 +3037,22 @@ function formatClock(ms) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+}
+
+function getSideName(color) {
+  return color===WHITE ? 'Белые' : 'Чёрные';
+}
+
+function getSideRole(color) {
+  return color===getPlayerSide() ? 'Игрок' : 'ИИ';
+}
+
+function getPlayerSideLabel() {
+  return getPlayerSide()===WHITE ? 'белыми' : 'чёрными';
+}
+
+function getPlayerTurnStatus() {
+  return `Ваш ход (${getPlayerSideLabel()})`;
 }
 
 function updateScoreDisplay() {
@@ -2771,18 +3082,29 @@ function closeTournamentInfo() {
   saveGame();
 }
 
+function updateSideLabels() {
+  document.getElementById('clock-white-side').textContent = 'Белые';
+  document.getElementById('clock-black-side').textContent = 'Чёрные';
+  document.getElementById('clock-white-meta').textContent = getSideRole(WHITE);
+  document.getElementById('clock-black-meta').textContent = getSideRole(BLACK);
+  document.getElementById('view-lock-btn').classList.toggle('active', !!chessGame.boardLocked);
+  document.getElementById('side-switch-btn').classList.toggle('active', getPlayerSide()===BLACK);
+}
+
 function updateTournamentDisplay() {
-  const isActive = chessGame.tournamentMode;
-  document.getElementById('tournament-toggle').checked = isActive;
+  const tournamentActive = chessGame.tournamentMode;
+  const clockActive = chessGame.clockRunning;
+  document.getElementById('tournament-toggle').checked = tournamentActive;
   document.getElementById('clock-white').textContent = formatClock(chessGame.clocks[WHITE]);
   document.getElementById('clock-black').textContent = formatClock(chessGame.clocks[BLACK]);
 
   const whiteBox = document.getElementById('clock-white-box');
   const blackBox = document.getElementById('clock-black-box');
-  whiteBox.classList.toggle('active', isActive && chessGame.engine.turn===WHITE && !isGameOverFlag);
-  blackBox.classList.toggle('active', isActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
-  whiteBox.classList.toggle('tournament-off', !isActive);
-  blackBox.classList.toggle('tournament-off', !isActive);
+  whiteBox.classList.toggle('active', clockActive && chessGame.engine.turn===WHITE && !isGameOverFlag);
+  blackBox.classList.toggle('active', clockActive && chessGame.engine.turn===BLACK && !isGameOverFlag);
+  whiteBox.classList.toggle('tournament-off', !clockActive);
+  blackBox.classList.toggle('tournament-off', !clockActive);
+  updateSideLabels();
   updateTournamentInfoVisibility();
 }
 
@@ -2829,6 +3151,14 @@ function resetTournamentClocks() {
   updateTournamentDisplay();
 }
 
+function setClockRunning(active) {
+  chessGame.clockRunning = !!active;
+  if(!chessGame.clockRunning) {
+    stopTournamentClock();
+  }
+  updateTournamentDisplay();
+}
+
 function stopTournamentClock() {
   if(tournamentClockInterval) {
     clearInterval(tournamentClockInterval);
@@ -2842,14 +3172,9 @@ function saveClockSnapshot() {
   if(history.length) history[history.length - 1].clockState = { ...chessGame.clocks };
 }
 
-function applyTournamentIncrement(color) {
-  if(!chessGame.tournamentMode) return;
-  chessGame.clocks[color] = Math.max(0, chessGame.clocks[color]) + TOURNAMENT_INCREMENT_MS;
-}
-
 function awardWin(color) {
-  if(color===WHITE) chessGame.scores.player += 1;
-  if(color===BLACK) chessGame.scores.ai += 1;
+  if(color===getPlayerSide()) chessGame.scores.player += 1;
+  if(color===getAISide()) chessGame.scores.ai += 1;
   updateScoreDisplay();
 }
 
@@ -2872,11 +3197,11 @@ function executeTimedOutMove(color) {
   legalMovesCache = [];
   renderHighlights();
 
-  addChatMessage('system', color===WHITE
+  addChatMessage('system', color===getPlayerSide()
     ? 'Время вышло: за вас выполнен случайный допустимый ход.'
     : 'Время ИИ вышло: выполнен случайный допустимый ход.');
 
-  if(color===WHITE) {
+  if(color===getPlayerSide()) {
     executePlayerMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to, getRandomPromotion(), true);
   } else {
     performAIMove(move, { skipComment: true, skipDelayMessage: true, forcePromotion: getRandomPromotion() });
@@ -2884,7 +3209,7 @@ function executeTimedOutMove(color) {
 }
 
 function tickTournamentClock() {
-  if(!chessGame.tournamentMode || isGameOverFlag || isAnimating) return;
+  if(!chessGame.clockRunning || isGameOverFlag || isAnimating) return;
 
   const now = performance.now();
   if(!chessGame.lastClockTick) {
@@ -2907,7 +3232,7 @@ function tickTournamentClock() {
 function syncTournamentClock() {
   stopTournamentClock();
   updateTournamentDisplay();
-  if(chessGame.tournamentMode && !isGameOverFlag && !isAnimating) {
+  if(chessGame.clockRunning && !isGameOverFlag && !isAnimating) {
     chessGame.lastClockTick = performance.now();
     tournamentClockInterval = setInterval(tickTournamentClock, 200);
   }
@@ -2915,17 +3240,41 @@ function syncTournamentClock() {
 
 function toggleTournamentMode(enabled) {
   chessGame.tournamentMode = enabled;
-  if(enabled) resetTournamentClocks();
-  else stopTournamentClock();
   selectedSquare = null;
   legalMovesCache = [];
   renderHighlights();
   updateTournamentDisplay();
-  syncTournamentClock();
   addChatMessage('system', enabled
-    ? 'Турнирный режим включён: подсветка ходов скрыта, часы запущены.'
+    ? 'Турнирный режим включён: подсветка ходов скрыта, часы продолжают идти как обычно.'
     : 'Турнирный режим отключён: подсветка ходов снова доступна.');
   saveGame();
+}
+
+function toggleBoardLock() {
+  chessGame.boardLocked = !chessGame.boardLocked;
+  hasManualCameraControl = false;
+  animateCameraTo(getDefaultCameraState(), chessGame.boardLocked ? 560 : 420);
+  updateSideLabels();
+  addChatMessage('system', chessGame.boardLocked
+    ? 'Вид зафиксирован сверху: вращение отключено, приближение и отдаление доступны.'
+    : 'Фиксация камеры отключена: доску снова можно свободно вращать.');
+  saveGame();
+}
+
+function togglePlayerSide() {
+  if(chessGame.trainingMatch) {
+    addChatMessage('system','В обучающем матче сторона фиксирована: вы играете белыми, чтобы подсказки были точными.');
+    return;
+  }
+  chessGame.playerSide = getPlayerSide()===WHITE ? BLACK : WHITE;
+  hasManualCameraControl = false;
+  cancelPendingAIMove();
+  applyResponsiveCameraPreset(true);
+  updateSideLabels();
+  newGame({ silent: true });
+  setStatus(isPlayerTurn() ? getPlayerTurnStatus() : 'ИИ думает...');
+  addChatMessage('system', `Сторона изменена: теперь вы играете ${getPlayerSideLabel()}. Начинаем новую партию.`);
+  if(isAITurn()) scheduleAIMove(260);
 }
 
 // ============================================================
@@ -3217,6 +3566,7 @@ function loadGame() {
 // ============================================================
 function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
   isAnimating = true;
+  cancelPendingAIMove();
   stopTournamentClock();
 
   const engine = chessGame.engine;
@@ -3236,13 +3586,8 @@ function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
   }
 
   const finalizeMove = () => {
-    const clockBeforeMove = { ...chessGame.clocks };
     engine.makeMove(fr,fc,tr,tc,move,promo);
-    if(chessGame.tournamentMode) {
-      chessGame.clocks = clockBeforeMove;
-      saveClockSnapshot();
-      applyTournamentIncrement(WHITE);
-    }
+    saveClockSnapshot();
     lastMoveHighlights = [{r:fr,c:fc},{r:tr,c:tc}];
     renderBoard();
     saveGame();
@@ -3250,8 +3595,8 @@ function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
     checkGameState();
     syncTournamentClock();
     if(chessGame.trainingMatch) clearTutorialHighlights();
-    if(engine.turn===BLACK && !isGameOver()) {
-      setTimeout(()=>doAIMove(), isTimedOut ? 80 : 200);
+    if(isAITurn() && !isGameOver()) {
+      scheduleAIMove(isTimedOut ? 80 : 200);
     }
   };
 
@@ -3267,29 +3612,13 @@ function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
   }
 }
 
-async function doAIMove() {
-  if(isGameOverFlag) return;
-  setStatus('ИИ думает...');
-  const waitMs = chessGame.difficulty==='hard' ? 220 : 140;
-  await new Promise(r=>setTimeout(r,waitMs));
-  try {
-    const response = await requestHelper('bestMove', { difficulty: chessGame.trainingMatch ? 'easy' : chessGame.difficulty });
-    const best = response.move;
-    if(!best) { checkGameState(); return; }
-    performAIMove(best);
-  } catch(e) {
-    const fallback = getBestMoveByDifficulty(chessGame.engine, chessGame.trainingMatch ? 'easy' : chessGame.difficulty);
-    if(!fallback) { checkGameState(); return; }
-    performAIMove(fallback);
-  }
-}
-
 function checkGameState() {
   const engine = chessGame.engine;
   const color = engine.turn;
 
   if(engine.isCheckmate(color)) {
     isGameOverFlag = true;
+    setClockRunning(false);
     stopTournamentClock();
     const winnerColor = color===WHITE ? BLACK : WHITE;
     const winner = winnerColor===WHITE ? 'Белые' : 'Чёрные';
@@ -3300,6 +3629,7 @@ function checkGameState() {
     saveGame();
   } else if(engine.isStalemate(color)) {
     isGameOverFlag = true;
+    setClockRunning(false);
     stopTournamentClock();
     showGameOver('ПАТ!','Ничья — у вас нет доступных ходов');
     addChatMessage('system','Ничья — пат!');
@@ -3307,16 +3637,19 @@ function checkGameState() {
     saveGame();
   } else if(engine.isInsufficientMaterial()) {
     isGameOverFlag = true;
+    setClockRunning(false);
     stopTournamentClock();
     showGameOver('НИЧЬЯ','Недостаточно фигур для мата');
     addChatMessage('system','Ничья — недостаточно фигур для мата.');
     if(chessGame.trainingMatch) endTrainingMatch(true);
     saveGame();
   } else if(engine.isInCheck(color)) {
-    setStatus(color===WHITE ? 'Шах вам!' : 'Шах чёрному королю!');
-    addChatMessage('system',color===WHITE ? 'Вашему королю объявлен шах!' : 'Шах чёрному королю!');
+    setStatus(color===getPlayerSide() ? 'Шах вам!' : `Шах ${getSideName(getAISide()).toLowerCase()}!`);
+    addChatMessage('system', color===getPlayerSide()
+      ? 'Вашему королю объявлен шах!'
+      : `Король ${getSideName(getAISide()).toLowerCase()} под шахом.`);
   } else {
-    setStatus(color===WHITE ? 'Ваш ход' : 'ИИ думает...');
+    setStatus(color===getPlayerSide() ? getPlayerTurnStatus() : 'ИИ думает...');
   }
 
   updateTournamentDisplay();
@@ -3356,8 +3689,11 @@ function saveGame() {
       tournamentInfoExpanded: chessGame.tournamentInfoExpanded,
       clocks: chessGame.clocks,
       scores: chessGame.scores,
+      clockRunning: chessGame.clockRunning,
       chatHidden: chessGame.chatHidden,
-      trainingMatch: chessGame.trainingMatch
+      trainingMatch: chessGame.trainingMatch,
+      playerSide: chessGame.playerSide,
+      boardLocked: chessGame.boardLocked
     };
     localStorage.setItem('chess_save',JSON.stringify(state));
   } catch(e) {}
@@ -3380,7 +3716,10 @@ function loadGame() {
     chessGame.tournamentInfoExpanded = !!s.tournamentInfoExpanded;
     chessGame.clocks = s.clocks || { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS };
     chessGame.scores = s.scores || { player:0, ai:0 };
+    chessGame.clockRunning = s.clockRunning !== false;
     chessGame.trainingMatch = !!s.trainingMatch;
+    chessGame.playerSide = s.playerSide || WHITE;
+    chessGame.boardLocked = !!s.boardLocked;
     setChatHidden(!!s.chatHidden);
 
     const chatEl = document.getElementById('chat-messages');
@@ -3397,6 +3736,8 @@ function loadGame() {
 
     updateScoreDisplay();
     updateTournamentDisplay();
+    updateSideLabels();
+    applyResponsiveCameraPreset(true);
     if(chessGame.trainingMatch) showTutorialPanel('Обучающий матч восстановлен. Сейчас подскажу следующий полезный ход.');
     return true;
   } catch(e) {
@@ -3406,10 +3747,16 @@ function loadGame() {
 
 function undoMove() {
   if(isAnimating || isGameOverFlag) return;
+  cancelPendingAIMove();
   const engine = chessGame.engine;
-  const h = engine.undoMove();
-  if(!h) return;
-  if(engine.turn===BLACK) engine.undoMove();
+  let undone = 0;
+  while(engine.moveHistory.length && undone < 2) {
+    const h = engine.undoMove();
+    if(!h) break;
+    undone += 1;
+    if(engine.turn===getPlayerSide()) break;
+  }
+  if(!undone) return;
 
   const lastHistory = engine.moveHistory[engine.moveHistory.length - 1];
   chessGame.clocks = lastHistory && lastHistory.clockState
@@ -3420,12 +3767,13 @@ function undoMove() {
   selectedSquare = null;
   legalMovesCache = [];
   renderBoard();
-  setStatus('Ваш ход');
+  setStatus(getPlayerTurnStatus());
   isGameOverFlag = false;
+  setClockRunning(true);
   document.getElementById('gameover-overlay').style.display='none';
   syncTournamentClock();
   saveGame();
-  if(chessGame.trainingMatch && chessGame.engine.turn===WHITE) requestTutorialHint(true);
+  if(chessGame.trainingMatch && isPlayerTurn()) requestTutorialHint(true);
   addChatMessage('system','Ход отменён');
 }
 
@@ -3435,7 +3783,9 @@ function newGame(options = {}) {
   const leavingTraining = chessGame.trainingMatch && !preserveTraining;
   if(leavingTraining) endTrainingMatch(false);
   isGameOverFlag = false;
+  cancelPendingAIMove();
   stopTournamentClock();
+  setClockRunning(true);
   chessGame.engine.reset();
   selectedSquare = null;
   legalMovesCache = [];
@@ -3444,28 +3794,30 @@ function newGame(options = {}) {
   closeTutorialComplete();
   resetTournamentClocks();
   renderBoard();
-  setStatus('Ваш ход');
+  setStatus(isPlayerTurn() ? getPlayerTurnStatus() : 'ИИ думает...');
   document.getElementById('chat-messages').innerHTML = '';
   if(!silent) {
     addChatMessage('system', leavingTraining
       ? 'Начата новая обычная партия. Обучение можно снова включить кнопкой «Обучение».'
-      : 'Новая партия начата. Удачи!');
+      : `Новая партия начата. Вы играете ${getPlayerSideLabel()}.`);
   }
   updateScoreDisplay();
   updateTournamentDisplay();
   syncTournamentClock();
   saveGame();
+  if(!silent && isAITurn()) scheduleAIMove(260);
 }
 
 function resignGame() {
   if(isGameOverFlag) return;
   const wasTraining = chessGame.trainingMatch;
   isGameOverFlag = true;
+  setClockRunning(false);
   stopTournamentClock();
   if(wasTraining) endTrainingMatch(false);
-  awardWin(BLACK);
-  showGameOver('ВЫ СДАЛИСЬ','Чёрные победили!');
-  addChatMessage('system','Вы сдались. Чёрные победили!');
+  awardWin(getAISide());
+  showGameOver('ВЫ СДАЛИСЬ',`${getSideName(getAISide())} победили!`);
+  addChatMessage('system',`${getSideName(getAISide())} победили после вашей сдачи.`);
   saveGame();
 }
 
@@ -3477,8 +3829,11 @@ function startGame() {
     return;
   }
   chessGame.trainingMatch = false;
-  addChatMessage('system','Добро пожаловать! Вы играете белыми. Ваш ход!');
+  setClockRunning(true);
+  setStatus(isPlayerTurn() ? getPlayerTurnStatus() : 'ИИ думает...');
+  addChatMessage('system', `Добро пожаловать! Вы играете ${getPlayerSideLabel()}.`);
   syncTournamentClock();
+  if(isAITurn()) scheduleAIMove(260);
 }
 
 // ============================================================
@@ -3525,6 +3880,7 @@ function onResize() {
   camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth <= 768 ? 1.25 : 1.8));
   applyResponsiveCameraPreset();
   updateMobileChatTrigger();
 }
@@ -3535,11 +3891,14 @@ function onResize() {
 const chessGame = {
   engine: new ChessEngine(),
   difficulty: 'medium',
+  playerSide: WHITE,
+  boardLocked: false,
   tournamentMode: false,
   tournamentInfoExpanded: false,
   chatHidden: false,
   clocks: { [WHITE]: TOURNAMENT_INITIAL_MS, [BLACK]: TOURNAMENT_INITIAL_MS },
   scores: { player: 0, ai: 0 },
+  clockRunning: false,
   lastClockTick: 0,
   trainingMatch: false,
   tutorialSuggestion: null,
@@ -3572,6 +3931,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   updateScoreDisplay();
   resetTournamentClocks();
   updateTournamentDisplay();
+  updateSideLabels();
   setChatHidden(false);
   setAIModelLabel(shouldUseMistral() ? 'local engine + mistral' : 'local engine');
   const searchParams = new URLSearchParams(window.location.search);
@@ -3582,7 +3942,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 
   setTimeout(()=>{
-    const saved=loadGame();
+    const saved = !wantsTutorial && loadGame();
     if(saved) {
       // Update difficulty buttons
       document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
@@ -3590,14 +3950,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
       renderBoard();
       updateScoreDisplay();
       updateTournamentDisplay();
-      setStatus(chessGame.engine.turn===WHITE?'Ваш ход':'ИИ думает...');
+      updateSideLabels();
+      setStatus(isPlayerTurn() ? getPlayerTurnStatus() : 'ИИ думает...');
       syncTournamentClock();
-      if(chessGame.trainingMatch && chessGame.engine.turn===WHITE) requestTutorialHint(true);
-      if(chessGame.engine.turn===BLACK) doAIMove();
+      if(chessGame.trainingMatch && isPlayerTurn()) requestTutorialHint(true);
+      if(isAITurn()) scheduleAIMove(260);
     } else {
       renderBoard();
       updateScoreDisplay();
       updateTournamentDisplay();
+      updateSideLabels();
       if(chessGame.pendingTrainingStart) startGame();
       else document.getElementById('popup-overlay').style.display='flex';
     }
