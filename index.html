@@ -127,6 +127,26 @@
     stroke: currentColor; fill: none; stroke-width: 1.9;
     stroke-linecap: round; stroke-linejoin: round;
   }
+  .icon-btn.icon-btn-text {
+    width: auto;
+    min-width: 36px;
+    padding: 0 9px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    font-family: inherit;
+  }
+  .mobile-chat-action { display: none !important; }
+  @media (max-width: 768px) {
+    .icon-btn.icon-btn-text {
+      padding: 0 7px;
+      font-size: 0.68rem;
+      height: 32px;
+      min-width: 32px;
+    }
+    .mobile-chat-action { display: inline-flex !important; }
+    body:not(.hidden-chat) #chat-toggle-btn { display: none !important; }
+  }
   .topbar-link-btn {
     background: transparent;
     border: none;
@@ -1134,12 +1154,14 @@
   <div class="status" id="status-text">Ваш ход</div>
   <div class="topbar-actions">
     <div class="mode-btns">
-      <button class="icon-btn" id="view-lock-btn" type="button" onclick="toggleBoardLock()" title="Фиксировать вид сверху" aria-label="Фиксировать вид сверху">
+      <button class="icon-btn" id="view-lock-btn" type="button" onclick="setCameraPreset('top')" title="Фиксировать вид сверху" aria-label="Фиксировать вид сверху">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <rect x="5" y="11" width="14" height="9" rx="2"></rect>
           <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
         </svg>
       </button>
+      <button class="icon-btn icon-btn-text" id="view-45-btn" type="button" onclick="setCameraPreset('45')" title="Зафиксировать вид под 45°" aria-label="Зафиксировать вид под 45°">45°</button>
+      <button class="icon-btn icon-btn-text" id="view-60-btn" type="button" onclick="setCameraPreset('60')" title="Зафиксировать вид под 60°" aria-label="Зафиксировать вид под 60°">60°</button>
       <button class="icon-btn" id="side-switch-btn" type="button" onclick="togglePlayerSide()" title="Сменить сторону" aria-label="Сменить сторону">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M7 7h10"></path>
@@ -1239,6 +1261,7 @@
   <button class="action-btn" onclick="undoMove()">Отменить ход</button>
   <button class="action-btn danger" id="resign-btn" onclick="resignGame()">Сдаться</button>
   <button class="action-btn" onclick="openTrainingTheory()">Обучение</button>
+  <button class="action-btn mobile-chat-action" id="action-chat-btn" type="button" onclick="toggleChat()">Чат с ИИ</button>
   <button id="tutorial-confirm-btn" class="action-btn tutorial-confirm hidden" type="button" onclick="confirmTutorialStep()">Понятно</button>
 </div>
 
@@ -1352,6 +1375,7 @@ class ChessEngine {
     this.enPassantTarget = null;
     this.moveHistory = [];
     this.halfMoveClock = 0;
+    this.posKeyHistory = [];
     this.capturedByWhite = [];
     this.capturedByBlack = [];
   }
@@ -1552,17 +1576,22 @@ class ChessEngine {
       captured = this.board[tr][tc];
     }
     this.applyMoveInternal(fr,fc,tr,tc,move,promoType);
+    const saveHalfMove = this.halfMoveClock;
+    if(piece.type==='p' || captured) this.halfMoveClock = 0;
+    else this.halfMoveClock = (this.halfMoveClock||0) + 1;
     this.moveHistory.push({
       board:saveBoard, ep:saveEP, cr:saveCR, turn:saveTurn,
       from:{r:fr,c:fc}, to:{r:tr,c:tc}, move, captured,
       capturedByWhite:[...this.capturedByWhite],
-      capturedByBlack:[...this.capturedByBlack]
+      capturedByBlack:[...this.capturedByBlack],
+      halfMoveClock: saveHalfMove
     });
     if(captured) {
       if(piece.color===WHITE) this.capturedByWhite.push(captured);
       else this.capturedByBlack.push(captured);
     }
     this.turn = this.turn===WHITE?BLACK:WHITE;
+    this.posKeyHistory.push(this.getPositionKey());
     return true;
   }
 
@@ -1575,7 +1604,17 @@ class ChessEngine {
     this.turn = h.turn;
     this.capturedByWhite = h.capturedByWhite;
     this.capturedByBlack = h.capturedByBlack;
+    if(typeof h.halfMoveClock === 'number') this.halfMoveClock = h.halfMoveClock;
+    if(this.posKeyHistory && this.posKeyHistory.length) this.posKeyHistory.pop();
     return h;
+  }
+
+  getPositionKey() {
+    const ep = this.enPassantTarget ? `${this.enPassantTarget.r}${this.enPassantTarget.c}` : '-';
+    const crw = this.castlingRights.w || {k:false,q:false};
+    const crb = this.castlingRights.b || {k:false,q:false};
+    const cr = `${crw.k?'K':''}${crw.q?'Q':''}${crb.k?'k':''}${crb.q?'q':''}` || '-';
+    return `${this.getBoardFEN()} ${this.turn} ${cr} ${ep}`;
   }
 
   isCheckmate(color) {
@@ -2197,22 +2236,26 @@ function initThree() {
   mouse = new THREE.Vector2();
 
   // Lighting
-  const ambient = new THREE.AmbientLight(0xFFE9A0, 0.4);
+  const ambient = new THREE.AmbientLight(0xFFF1B8, 0.78);
   scene.add(ambient);
 
-  const mainLight = new THREE.DirectionalLight(0xFFD700, 1.5);
+  const mainLight = new THREE.DirectionalLight(0xFFE39A, 2.05);
   mainLight.position.set(5, 12, 5);
   mainLight.castShadow = true;
   mainLight.shadow.mapSize.set(isMobileViewport ? 1024 : 2048, isMobileViewport ? 1024 : 2048);
   scene.add(mainLight);
 
-  const fillLight = new THREE.PointLight(0xFFAA00, 0.8, 30);
+  const fillLight = new THREE.PointLight(0xFFC36A, 1.35, 32);
   fillLight.position.set(-5, 8, -5);
   scene.add(fillLight);
 
-  const rimLight = new THREE.PointLight(0xFFCC44, 0.5, 20);
+  const rimLight = new THREE.PointLight(0xFFD46B, 0.85, 22);
   rimLight.position.set(0, 3, -8);
   scene.add(rimLight);
+
+  // Soft hemisphere light to lift dark pieces from below.
+  const hemiLight = new THREE.HemisphereLight(0xFFE3A5, 0.6);
+  scene.add(hemiLight);
 
   // Board
   buildBoard();
@@ -2482,19 +2525,19 @@ function createPieceMesh(type, color) {
   let mat;
   if(color===WHITE) {
     mat = new THREE.MeshStandardMaterial({
-      color: 0xE9D8A6,
-      metalness: 0.55,
-      roughness: 0.2,
-      emissive: 0x7A5D23,
-      emissiveIntensity: 0.1
+      color: 0xF6E6B0,
+      metalness: 0.5,
+      roughness: 0.22,
+      emissive: 0xB58A2C,
+      emissiveIntensity: 0.18
     });
   } else {
     mat = new THREE.MeshStandardMaterial({
-      color: 0x2B3038,
-      metalness: 0.5,
-      roughness: 0.35,
-      emissive: 0x0E1117,
-      emissiveIntensity: 0.22
+      color: 0x4A4F58,
+      metalness: 0.45,
+      roughness: 0.38,
+      emissive: 0x2A2F36,
+      emissiveIntensity: 0.42
     });
   }
   const mesh = new THREE.Mesh(geo, mat);
@@ -2610,12 +2653,20 @@ function setupCameraControls() {
   el.addEventListener('touchend', onTouchEnd);
 }
 
+const CAMERA_PRESETS = {
+  top: { phi: 0.12, radiusDesktop: 9.1,  radiusMobile: 10.6 },
+  '45': { phi: Math.PI / 4, radiusDesktop: 9.6,  radiusMobile: 12.6 },
+  '60': { phi: Math.PI / 3, radiusDesktop: 10.4, radiusMobile: 13.8 }
+};
+
 function getDefaultCameraState() {
   const isMobile = window.innerWidth <= 768;
   const isPortrait = window.innerHeight >= window.innerWidth;
   const theta = getPlayerSide()===WHITE ? 0 : Math.PI;
   if(chessGame.boardLocked) {
-    return { theta, phi: 0.12, radius: isMobile ? 10.6 : 9.1 };
+    const presetKey = CAMERA_PRESETS[chessGame.cameraPreset] ? chessGame.cameraPreset : 'top';
+    const preset = CAMERA_PRESETS[presetKey];
+    return { theta, phi: preset.phi, radius: isMobile ? preset.radiusMobile : preset.radiusDesktop };
   }
   if(isMobile && isPortrait) return { theta, phi: 1.16, radius: 13.6 };
   if(isMobile) return { theta, phi: 1.04, radius: 12.2 };
@@ -2624,14 +2675,21 @@ function getDefaultCameraState() {
 
 function updateCamera() {
   const isMobile = window.innerWidth <= 768;
-  const minRadius = chessGame.boardLocked ? (isMobile ? 5.8 : 5.6) : (isMobile ? 4.2 : 5);
-  const maxRadius = chessGame.boardLocked ? (isMobile ? 23.5 : 18.5) : (isMobile ? 24 : 18);
-  camRadius = Math.max(minRadius, Math.min(maxRadius, camRadius));
-  const minPhi = chessGame.boardLocked ? 0.08 : 0.3;
-  const maxPhi = chessGame.boardLocked ? 0.24 : Math.PI/2.1;
-  camPhi = Math.max(minPhi, Math.min(maxPhi, camPhi));
   if(chessGame.boardLocked) {
+    const presetKey = CAMERA_PRESETS[chessGame.cameraPreset] ? chessGame.cameraPreset : 'top';
+    const preset = CAMERA_PRESETS[presetKey];
+    camPhi = preset.phi;
     camTheta = getPlayerSide()===WHITE ? 0 : Math.PI;
+    const minRadius = isMobile ? 5.8 : 5.6;
+    const maxRadius = isMobile ? 23.5 : 18.5;
+    camRadius = Math.max(minRadius, Math.min(maxRadius, camRadius));
+  } else {
+    const minRadius = isMobile ? 4.2 : 5;
+    const maxRadius = isMobile ? 24 : 18;
+    camRadius = Math.max(minRadius, Math.min(maxRadius, camRadius));
+    const minPhi = 0.3;
+    const maxPhi = Math.PI / 2.1;
+    camPhi = Math.max(minPhi, Math.min(maxPhi, camPhi));
   }
   camera.position.x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
   camera.position.y = camRadius * Math.cos(camPhi);
@@ -3067,14 +3125,27 @@ function updateCapturedDisplay() {
 }
 
 function getSerializableGameState() {
+  const engine = chessGame.engine;
+  // Build set of positions that have already occurred at least twice (next visit = 3-fold).
+  const counts = new Map();
+  const prior = [];
+  if(Array.isArray(engine.posKeyHistory)) {
+    for(const k of engine.posKeyHistory) {
+      const n = (counts.get(k) || 0) + 1;
+      counts.set(k, n);
+      if(n >= 2) prior.push(k);
+    }
+  }
   return {
-    board: chessGame.engine.board,
-    turn: chessGame.engine.turn,
-    castlingRights: chessGame.engine.castlingRights,
-    enPassantTarget: chessGame.engine.enPassantTarget,
-    moveHistory: chessGame.engine.moveHistory.map(move => ({ from: move.from, to: move.to })),
-    capturedByWhite: chessGame.engine.capturedByWhite,
-    capturedByBlack: chessGame.engine.capturedByBlack
+    board: engine.board,
+    turn: engine.turn,
+    castlingRights: engine.castlingRights,
+    enPassantTarget: engine.enPassantTarget,
+    moveHistory: engine.moveHistory.map(move => ({ from: move.from, to: move.to })),
+    capturedByWhite: engine.capturedByWhite,
+    capturedByBlack: engine.capturedByBlack,
+    halfmoveClock: engine.halfMoveClock || 0,
+    priorPositions: prior
   };
 }
 
@@ -3331,7 +3402,7 @@ function updateSideLabels() {
   document.getElementById('clock-black-side').textContent = 'Чёрные';
   document.getElementById('clock-white-meta').textContent = getSideRole(WHITE);
   document.getElementById('clock-black-meta').textContent = getSideRole(BLACK);
-  document.getElementById('view-lock-btn').classList.toggle('active', !!chessGame.boardLocked);
+  updateViewLockButtons();
   document.getElementById('side-switch-btn').classList.toggle('active', getPlayerSide()===BLACK);
 }
 
@@ -3363,15 +3434,18 @@ function updateTournamentDisplay() {
 function updateMobileChatTrigger() {
   const toggleBtn = document.getElementById('chat-toggle-btn');
   const restoreBtn = document.getElementById('chat-restore-btn');
+  const actionChatBtn = document.getElementById('action-chat-btn');
   const panel = document.getElementById('chat-panel');
   if(!toggleBtn || !panel) return;
   const isMobile = window.innerWidth <= 768;
+  const isOpen = panel.classList.contains('mobile-open');
   if(isMobile) {
-    toggleBtn.textContent = panel.classList.contains('mobile-open') ? 'Свернуть чат' : 'Чат с ИИ';
+    toggleBtn.textContent = isOpen ? 'Свернуть чат' : 'Чат с ИИ';
   } else {
     toggleBtn.textContent = 'ЧАТ';
   }
   if(restoreBtn && isMobile) restoreBtn.textContent = 'Чат с ИИ';
+  if(actionChatBtn) actionChatBtn.textContent = isOpen ? 'Свернуть чат' : 'Чат с ИИ';
 }
 
 function setChatHidden(hidden) {
@@ -3506,15 +3580,41 @@ function toggleTournamentMode(enabled) {
   saveGame();
 }
 
-function toggleBoardLock() {
-  chessGame.boardLocked = !chessGame.boardLocked;
+function updateViewLockButtons() {
+  const presetKey = chessGame.boardLocked ? (chessGame.cameraPreset || 'top') : null;
+  const top = document.getElementById('view-lock-btn');
+  const v45 = document.getElementById('view-45-btn');
+  const v60 = document.getElementById('view-60-btn');
+  if(top) top.classList.toggle('active', presetKey === 'top');
+  if(v45) v45.classList.toggle('active', presetKey === '45');
+  if(v60) v60.classList.toggle('active', presetKey === '60');
+}
+
+function setCameraPreset(preset) {
+  if(!CAMERA_PRESETS[preset]) preset = 'top';
+  const wasLocked = chessGame.boardLocked;
+  const wasPreset = chessGame.cameraPreset;
+  if(wasLocked && wasPreset === preset) {
+    chessGame.boardLocked = false;
+  } else {
+    chessGame.boardLocked = true;
+    chessGame.cameraPreset = preset;
+  }
   hasManualCameraControl = false;
   animateCameraTo(getDefaultCameraState(), chessGame.boardLocked ? 560 : 420);
   updateSideLabels();
-  addChatMessage('system', chessGame.boardLocked
-    ? 'Вид зафиксирован сверху: вращение отключено, приближение и отдаление доступны.'
-    : 'Фиксация камеры отключена: доску снова можно свободно вращать.');
+  if(chessGame.boardLocked) {
+    const labels = { top: 'сверху', '45': 'под 45°', '60': 'под 60°' };
+    addChatMessage('system', `Вид зафиксирован ${labels[preset]}: вращение отключено, приближение и отдаление доступны.`);
+  } else {
+    addChatMessage('system', 'Фиксация камеры отключена: доску снова можно свободно вращать.');
+  }
   saveGame();
+}
+
+function toggleBoardLock() { setCameraPreset('top'); return;
+  // legacy entrypoint kept for backward compatibility
+  // eslint-disable-next-line no-unreachable
 }
 
 function togglePlayerSide() {
@@ -3868,6 +3968,15 @@ function executePlayerMove(fr,fc,tr,tc,move,promo='q',isTimedOut=false) {
   }
 }
 
+function isThreefoldRepetition(engine) {
+  const hist = engine.posKeyHistory;
+  if(!Array.isArray(hist) || hist.length < 4) return false;
+  const current = hist[hist.length - 1];
+  let count = 0;
+  for(let i = 0; i < hist.length; i++) if(hist[i] === current) count++;
+  return count >= 3;
+}
+
 function checkGameState() {
   const engine = chessGame.engine;
   const color = engine.turn;
@@ -3900,6 +4009,24 @@ function checkGameState() {
     stopTournamentClock();
     showGameOver('НИЧЬЯ','Недостаточно фигур для мата');
     addChatMessage('system','Ничья — недостаточно фигур для мата.');
+    if(chessGame.trainingMatch) endTrainingMatch(true);
+    saveGame();
+  } else if((engine.halfMoveClock || 0) >= 100) {
+    isGameOverFlag = true;
+    setAIThinking(false);
+    setClockRunning(false);
+    stopTournamentClock();
+    showGameOver('НИЧЬЯ','Правило 50 ходов: 50 ходов без взятий и движения пешки.');
+    addChatMessage('system','Ничья — правило 50 ходов.');
+    if(chessGame.trainingMatch) endTrainingMatch(true);
+    saveGame();
+  } else if(isThreefoldRepetition(engine)) {
+    isGameOverFlag = true;
+    setAIThinking(false);
+    setClockRunning(false);
+    stopTournamentClock();
+    showGameOver('НИЧЬЯ','Троекратное повторение позиции.');
+    addChatMessage('system','Ничья — троекратное повторение позиции.');
     if(chessGame.trainingMatch) endTrainingMatch(true);
     saveGame();
   } else if(engine.isInCheck(color)) {
@@ -3944,6 +4071,8 @@ function saveGame() {
       history: chessGame.engine.moveHistory,
       capturedByWhite: chessGame.engine.capturedByWhite,
       capturedByBlack: chessGame.engine.capturedByBlack,
+      halfMoveClock: chessGame.engine.halfMoveClock || 0,
+      posKeyHistory: chessGame.engine.posKeyHistory || [],
       chat: chatMsgs,
       tournamentMode: chessGame.tournamentMode,
       tournamentInfoExpanded: chessGame.tournamentInfoExpanded,
@@ -3953,7 +4082,8 @@ function saveGame() {
       chatHidden: chessGame.chatHidden,
       trainingMatch: chessGame.trainingMatch,
       playerSide: chessGame.playerSide,
-      boardLocked: chessGame.boardLocked
+      boardLocked: chessGame.boardLocked,
+      cameraPreset: chessGame.cameraPreset || 'top'
     };
     localStorage.setItem('chess_save',JSON.stringify(state));
   } catch(e) {}
@@ -3971,6 +4101,8 @@ function loadGame() {
     chessGame.engine.moveHistory = s.history || [];
     chessGame.engine.capturedByWhite = s.capturedByWhite || [];
     chessGame.engine.capturedByBlack = s.capturedByBlack || [];
+    chessGame.engine.halfMoveClock = typeof s.halfMoveClock === 'number' ? s.halfMoveClock : 0;
+    chessGame.engine.posKeyHistory = Array.isArray(s.posKeyHistory) ? s.posKeyHistory.slice() : [];
     chessGame.difficulty = s.difficulty || 'medium';
     chessGame.tournamentMode = !!s.tournamentMode;
     chessGame.tournamentInfoExpanded = !!s.tournamentInfoExpanded;
@@ -3980,6 +4112,7 @@ function loadGame() {
     chessGame.trainingMatch = !!s.trainingMatch;
     chessGame.playerSide = s.playerSide || WHITE;
     chessGame.boardLocked = !!s.boardLocked;
+    chessGame.cameraPreset = (s.cameraPreset && CAMERA_PRESETS[s.cameraPreset]) ? s.cameraPreset : 'top';
     setChatHidden(!!s.chatHidden);
 
     const chatEl = document.getElementById('chat-messages');
@@ -4161,6 +4294,7 @@ const chessGame = {
   difficulty: 'medium',
   playerSide: WHITE,
   boardLocked: false,
+  cameraPreset: 'top',
   tournamentMode: false,
   tournamentInfoExpanded: false,
   chatHidden: false,
@@ -4178,9 +4312,38 @@ const chessGame = {
 // ============================================================
 // INIT
 // ============================================================
+// Pause the tournament clock if the tab is hidden or the device is offline,
+// so the player isn't auto-flagged on a brief network/visibility blip.
+let _resumeClockAfterPause = false;
+function _shouldPauseGameLifecycle() {
+  return (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+      || (typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+function _onLifecyclePauseChange() {
+  if(_shouldPauseGameLifecycle()) {
+    try { saveGame(); } catch(e) {}
+    if(isGameOverFlag) return;
+    if(chessGame.clockRunning) {
+      _resumeClockAfterPause = true;
+      chessGame.clockRunning = false;
+      stopTournamentClock();
+      updateTournamentDisplay();
+    }
+  } else if(!isGameOverFlag && _resumeClockAfterPause) {
+    _resumeClockAfterPause = false;
+    chessGame.clockRunning = true;
+    chessGame.lastClockTick = performance.now();
+    syncTournamentClock();
+    updateTournamentDisplay();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', ()=>{
   // Prevent context menu
   document.addEventListener('contextmenu',e=>e.preventDefault());
+  document.addEventListener('visibilitychange', _onLifecyclePauseChange);
+  window.addEventListener('online', _onLifecyclePauseChange);
+  window.addEventListener('offline', _onLifecyclePauseChange);
   initHelperWorker();
   document.addEventListener('click', e => {
     if(!chessGame.tournamentInfoExpanded) return;

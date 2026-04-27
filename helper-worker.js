@@ -5,13 +5,19 @@ const BOARD_FILES = 'abcdefgh';
 const BOARD_RANKS = '87654321';
 const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const CHECKMATE_SCORE = 100000;
-const QUIESCENCE_CAP_DEPTH = 12;
-const SEARCH_LIMITS = { easy: 0, medium: 700, hard: 9000 };
-const HARD_MAX_DEPTH = 17;
+const QUIESCENCE_CAP_DEPTH = 10;
+const SEARCH_LIMITS = { easy: 0, medium: 1500, hard: 9000 };
+const HARD_MAX_DEPTH = 20;
 const ASPIRATION_WINDOW = 45;
+const MAX_CHECK_EXTENSIONS = 2;
+const NMP_MIN_DEPTH = 3;
 const TT_EXACT = 0;
 const TT_LOWER = 1;
 const TT_UPPER = 2;
+const KNIGHT_DELTAS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const ORTHO_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+const DIAG_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
+const ALL_DIRS = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
 const PST = {
   p: [
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -94,6 +100,8 @@ class ChessEngine {
     this.moveHistory = [];
     this.capturedByWhite = [];
     this.capturedByBlack = [];
+    this.halfmoveClock = 0;
+    this.priorPositions = null;
   }
 
   cloneBoard() {
@@ -105,9 +113,12 @@ class ChessEngine {
     this.turn = state.turn;
     this.castlingRights = JSON.parse(JSON.stringify(state.castlingRights));
     this.enPassantTarget = state.enPassantTarget ? {...state.enPassantTarget} : null;
-    this.moveHistory = (state.moveHistory || []).map(move => ({...move}));
+    // Keep prior history (from/to) so opening book can read it; search will append its own undo records on top.
+    this.moveHistory = (state.moveHistory || []).map(m => ({ from: m.from, to: m.to }));
     this.capturedByWhite = (state.capturedByWhite || []).map(piece => ({...piece}));
     this.capturedByBlack = (state.capturedByBlack || []).map(piece => ({...piece}));
+    this.halfmoveClock = typeof state.halfmoveClock === 'number' ? state.halfmoveClock : 0;
+    this.priorPositions = new Set(Array.isArray(state.priorPositions) ? state.priorPositions : []);
   }
 
   getPiece(r,c) { return (r>=0&&r<8&&c>=0&&c<8) ? this.board[r][c] : null; }
@@ -221,11 +232,60 @@ class ChessEngine {
   }
 
   isSquareAttacked(r,c,byColor) {
-    for(let fr=0;fr<8;fr++) for(let fc=0;fc<8;fc++) {
-      const piece = this.getPiece(fr,fc);
-      if(!piece || piece.color!==byColor) continue;
-      const pseudo = this.getPseudoMoves(fr,fc,piece,true);
-      if(pseudo.some(move => move.r===r && move.c===c)) return true;
+    const board = this.board;
+    // Pawn attacks: a pawn of byColor stands one row before (r,c) in its forward direction.
+    const pawnRow = byColor===WHITE ? r+1 : r-1;
+    if(pawnRow>=0 && pawnRow<8) {
+      if(c>0) {
+        const p = board[pawnRow][c-1];
+        if(p && p.color===byColor && p.type==='p') return true;
+      }
+      if(c<7) {
+        const p = board[pawnRow][c+1];
+        if(p && p.color===byColor && p.type==='p') return true;
+      }
+    }
+    // Knight
+    for(let i=0;i<8;i++) {
+      const dr = KNIGHT_DELTAS[i][0], dc = KNIGHT_DELTAS[i][1];
+      const nr = r+dr, nc = c+dc;
+      if(nr<0||nr>7||nc<0||nc>7) continue;
+      const p = board[nr][nc];
+      if(p && p.color===byColor && p.type==='n') return true;
+    }
+    // King
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) {
+      if(!dr && !dc) continue;
+      const nr = r+dr, nc = c+dc;
+      if(nr<0||nr>7||nc<0||nc>7) continue;
+      const p = board[nr][nc];
+      if(p && p.color===byColor && p.type==='k') return true;
+    }
+    // Rook/Queen orthogonal rays
+    for(let i=0;i<4;i++) {
+      const dr = ORTHO_DIRS[i][0], dc = ORTHO_DIRS[i][1];
+      let nr = r+dr, nc = c+dc;
+      while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+        const p = board[nr][nc];
+        if(p) {
+          if(p.color===byColor && (p.type==='r' || p.type==='q')) return true;
+          break;
+        }
+        nr += dr; nc += dc;
+      }
+    }
+    // Bishop/Queen diagonal rays
+    for(let i=0;i<4;i++) {
+      const dr = DIAG_DIRS[i][0], dc = DIAG_DIRS[i][1];
+      let nr = r+dr, nc = c+dc;
+      while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+        const p = board[nr][nc];
+        if(p) {
+          if(p.color===byColor && (p.type==='b' || p.type==='q')) return true;
+          break;
+        }
+        nr += dr; nc += dc;
+      }
     }
     return false;
   }
@@ -241,17 +301,55 @@ class ChessEngine {
   }
 
   wouldBeInCheck(fr,fc,tr,tc,move) {
-    const saveBoard = this.cloneBoard();
-    const saveEP = this.enPassantTarget ? {...this.enPassantTarget} : null;
-    const saveCR = JSON.parse(JSON.stringify(this.castlingRights));
-    const movingColor = this.board[fr][fc] ? this.board[fr][fc].color : null;
-    if(!movingColor) return false;
-    this.applyMoveInternal(fr,fc,tr,tc,move,'q');
-    const check = this.isInCheck(movingColor);
-    this.board = saveBoard;
-    this.enPassantTarget = saveEP;
-    this.castlingRights = saveCR;
-    return check;
+    const board = this.board;
+    const piece = board[fr][fc];
+    if(!piece) return false;
+    const movingColor = piece.color;
+    const oppColor = movingColor===WHITE ? BLACK : WHITE;
+    const isPromotion = piece.type==='p' && (tr===0 || tr===7);
+    const targetBefore = board[tr][tc];
+    let epCapR = -1, epCapC = -1, epCapPiece = null;
+    let castleSide = null;
+
+    // Apply move in-place
+    if(isPromotion) board[tr][tc] = { type: (move && move.promotion) || 'q', color: piece.color };
+    else board[tr][tc] = piece;
+    board[fr][fc] = null;
+
+    if(move && move.enPassant) {
+      epCapR = movingColor===WHITE ? tr+1 : tr-1;
+      epCapC = tc;
+      epCapPiece = board[epCapR][epCapC];
+      board[epCapR][epCapC] = null;
+    }
+    if(move && move.castle) {
+      castleSide = move.castle;
+      const row = fr;
+      if(castleSide==='k') { board[row][5] = board[row][7]; board[row][7] = null; }
+      else { board[row][3] = board[row][0]; board[row][0] = null; }
+    }
+
+    // Find moving color's king
+    let kr = -1, kc = -1;
+    if(piece.type==='k') { kr = tr; kc = tc; }
+    else {
+      outer: for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+        const p = board[r][c];
+        if(p && p.type==='k' && p.color===movingColor) { kr = r; kc = c; break outer; }
+      }
+    }
+    const inCheck = (kr>=0) ? this.isSquareAttacked(kr, kc, oppColor) : false;
+
+    // Restore
+    board[fr][fc] = piece;
+    board[tr][tc] = targetBefore;
+    if(epCapPiece) board[epCapR][epCapC] = epCapPiece;
+    if(castleSide) {
+      const row = fr;
+      if(castleSide==='k') { board[row][7] = board[row][5]; board[row][5] = null; }
+      else { board[row][0] = board[row][3]; board[row][3] = null; }
+    }
+    return inCheck;
   }
 
   applyMoveInternal(fr,fc,tr,tc,move,promoType='q') {
@@ -291,50 +389,108 @@ class ChessEngine {
   }
 
   makeMove(fr,fc,tr,tc,move,promoType='q') {
-    const piece = this.board[fr][fc];
+    const board = this.board;
+    const piece = board[fr][fc];
     if(!piece) return false;
-    const saveBoard = this.cloneBoard();
-    const saveEP = this.enPassantTarget ? {...this.enPassantTarget} : null;
-    const saveCR = JSON.parse(JSON.stringify(this.castlingRights));
-    const saveTurn = this.turn;
+    const movingColor = piece.color;
+    const isPromotion = piece.type==='p' && (tr===0 || tr===7);
+    const targetBefore = board[tr][tc];
     let captured = null;
+    let epCapR = -1, epCapC = -1, epCapPiece = null;
     if(move && move.enPassant) {
-      const capRow = piece.color===WHITE ? tr+1 : tr-1;
-      captured = this.board[capRow][tc];
+      epCapR = movingColor===WHITE ? tr+1 : tr-1;
+      epCapC = tc;
+      epCapPiece = board[epCapR][epCapC];
+      captured = epCapPiece;
     } else {
-      captured = this.board[tr][tc];
+      captured = targetBefore;
     }
-    this.applyMoveInternal(fr,fc,tr,tc,move,promoType);
-    this.moveHistory.push({
-      board: saveBoard,
-      ep: saveEP,
-      cr: saveCR,
-      turn: saveTurn,
+    const undoData = {
       from:{r:fr,c:fc},
       to:{r:tr,c:tc},
       move,
-      captured,
-      capturedByWhite:[...this.capturedByWhite],
-      capturedByBlack:[...this.capturedByBlack]
-    });
+      pieceBefore: piece,
+      targetBefore,
+      epCapR, epCapC, epCapPiece,
+      castle: (move && move.castle) ? move.castle : null,
+      savedEP: this.enPassantTarget,
+      savedCR: { w:{...this.castlingRights.w}, b:{...this.castlingRights.b} },
+      savedTurn: this.turn,
+      savedHalf: this.halfmoveClock,
+      savedCapturedByWhite: this.capturedByWhite,
+      savedCapturedByBlack: this.capturedByBlack,
+      captured
+    };
+    // Apply move
+    if(isPromotion) board[tr][tc] = { type: promoType || (move && move.promotion) || 'q', color: movingColor };
+    else board[tr][tc] = piece;
+    board[fr][fc] = null;
+    if(epCapPiece) board[epCapR][epCapC] = null;
+    if(undoData.castle) {
+      const row = fr;
+      if(undoData.castle==='k') { board[row][5] = board[row][7]; board[row][7] = null; }
+      else { board[row][3] = board[row][0]; board[row][0] = null; }
+    }
+    // EP target
+    this.enPassantTarget = (move && move.doublePush) ? {r:(fr+tr)/2,c:fc} : null;
+    // Castling rights
+    if(piece.type==='k') this.castlingRights[movingColor] = {k:false, q:false};
+    else if(piece.type==='r') {
+      const cr = this.castlingRights[movingColor];
+      if(fc===0 && cr.q) this.castlingRights[movingColor] = {...cr, q:false};
+      else if(fc===7 && cr.k) this.castlingRights[movingColor] = {...cr, k:false};
+    }
+    if(captured && captured.type==='r') {
+      const oppColor = captured.color;
+      const opRow = oppColor===WHITE ? 7 : 0;
+      if(tr===opRow && tc===0) {
+        const cr = this.castlingRights[oppColor];
+        if(cr.q) this.castlingRights[oppColor] = {...cr, q:false};
+      } else if(tr===opRow && tc===7) {
+        const cr = this.castlingRights[oppColor];
+        if(cr.k) this.castlingRights[oppColor] = {...cr, k:false};
+      }
+    }
+    // Halfmove clock
+    if(piece.type==='p' || captured) this.halfmoveClock = 0;
+    else this.halfmoveClock = this.halfmoveClock + 1;
+    // Captured tracking (immutable arrays)
     if(captured) {
-      if(piece.color===WHITE) this.capturedByWhite.push(captured);
-      else this.capturedByBlack.push(captured);
+      if(movingColor===WHITE) this.capturedByWhite = this.capturedByWhite.concat(captured);
+      else this.capturedByBlack = this.capturedByBlack.concat(captured);
     }
     this.turn = this.turn===WHITE ? BLACK : WHITE;
+    this.moveHistory.push(undoData);
     return true;
   }
 
   undoMove() {
     if(!this.moveHistory.length) return false;
-    const h = this.moveHistory.pop();
-    this.board = h.board;
-    this.enPassantTarget = h.ep;
-    this.castlingRights = h.cr;
-    this.turn = h.turn;
-    this.capturedByWhite = h.capturedByWhite;
-    this.capturedByBlack = h.capturedByBlack;
-    return h;
+    const u = this.moveHistory.pop();
+    const board = this.board;
+    board[u.from.r][u.from.c] = u.pieceBefore;
+    if(u.move && u.move.enPassant) {
+      board[u.to.r][u.to.c] = null;
+      board[u.epCapR][u.epCapC] = u.epCapPiece;
+    } else {
+      board[u.to.r][u.to.c] = u.targetBefore;
+    }
+    if(u.castle==='k') {
+      const row = u.from.r;
+      board[row][7] = board[row][5];
+      board[row][5] = null;
+    } else if(u.castle==='q') {
+      const row = u.from.r;
+      board[row][0] = board[row][3];
+      board[row][3] = null;
+    }
+    this.enPassantTarget = u.savedEP;
+    this.castlingRights = u.savedCR;
+    this.turn = u.savedTurn;
+    this.halfmoveClock = u.savedHalf;
+    this.capturedByWhite = u.savedCapturedByWhite;
+    this.capturedByBlack = u.savedCapturedByBlack;
+    return u;
   }
 
   isCheckmate(color) {
@@ -685,6 +841,154 @@ function isQuietMove(engine, move) {
   return !getCapturePiece(engine, move) && !move.to.castle && !isPromotionMove(engine, move);
 }
 
+function hasNonPawnMaterial(engine, color) {
+  const board = engine.board;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = board[r][c];
+    if(p && p.color===color && p.type!=='k' && p.type!=='p') return true;
+  }
+  return false;
+}
+
+function findSmallestAttacker(board, tr, tc, byColor, removed) {
+  // Returns {r, c, value} of cheapest attacker of (tr,tc) by byColor that isn't in removed.
+  // Ray-scans treat removed squares as transparent (x-ray support).
+  // Pawn
+  const pawnRow = byColor===WHITE ? tr+1 : tr-1;
+  if(pawnRow>=0 && pawnRow<8) {
+    if(tc>0) {
+      const idx = pawnRow*8 + (tc-1);
+      const p = board[pawnRow][tc-1];
+      if(p && p.color===byColor && p.type==='p' && !removed.has(idx)) return {r:pawnRow,c:tc-1,value:PIECE_VALUES.p};
+    }
+    if(tc<7) {
+      const idx = pawnRow*8 + (tc+1);
+      const p = board[pawnRow][tc+1];
+      if(p && p.color===byColor && p.type==='p' && !removed.has(idx)) return {r:pawnRow,c:tc+1,value:PIECE_VALUES.p};
+    }
+  }
+  // Knight
+  for(let i=0;i<8;i++) {
+    const dr = KNIGHT_DELTAS[i][0], dc = KNIGHT_DELTAS[i][1];
+    const nr = tr+dr, nc = tc+dc;
+    if(nr<0||nr>7||nc<0||nc>7) continue;
+    const idx = nr*8+nc;
+    if(removed.has(idx)) continue;
+    const p = board[nr][nc];
+    if(p && p.color===byColor && p.type==='n') return {r:nr,c:nc,value:PIECE_VALUES.n};
+  }
+  // Diagonal rays for bishop/queen
+  let bestDiag = null;
+  for(let i=0;i<4;i++) {
+    const dr = DIAG_DIRS[i][0], dc = DIAG_DIRS[i][1];
+    let nr = tr+dr, nc = tc+dc;
+    while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+      const idx = nr*8+nc;
+      if(!removed.has(idx)) {
+        const p = board[nr][nc];
+        if(p) {
+          if(p.color===byColor && p.type==='b') {
+            if(!bestDiag || PIECE_VALUES.b < bestDiag.value) bestDiag = {r:nr,c:nc,value:PIECE_VALUES.b};
+          }
+          break;
+        }
+      }
+      nr+=dr; nc+=dc;
+    }
+  }
+  if(bestDiag) return bestDiag;
+  // Orthogonal rays for rook
+  let bestOrtho = null;
+  for(let i=0;i<4;i++) {
+    const dr = ORTHO_DIRS[i][0], dc = ORTHO_DIRS[i][1];
+    let nr = tr+dr, nc = tc+dc;
+    while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+      const idx = nr*8+nc;
+      if(!removed.has(idx)) {
+        const p = board[nr][nc];
+        if(p) {
+          if(p.color===byColor && p.type==='r') {
+            if(!bestOrtho || PIECE_VALUES.r < bestOrtho.value) bestOrtho = {r:nr,c:nc,value:PIECE_VALUES.r};
+          }
+          break;
+        }
+      }
+      nr+=dr; nc+=dc;
+    }
+  }
+  if(bestOrtho) return bestOrtho;
+  // Queen via any direction
+  let bestQueen = null;
+  for(let i=0;i<8;i++) {
+    const dr = ALL_DIRS[i][0], dc = ALL_DIRS[i][1];
+    let nr = tr+dr, nc = tc+dc;
+    while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+      const idx = nr*8+nc;
+      if(!removed.has(idx)) {
+        const p = board[nr][nc];
+        if(p) {
+          if(p.color===byColor && p.type==='q') bestQueen = {r:nr,c:nc,value:PIECE_VALUES.q};
+          break;
+        }
+      }
+      nr+=dr; nc+=dc;
+    }
+  }
+  if(bestQueen) return bestQueen;
+  // King last
+  for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) {
+    if(!dr && !dc) continue;
+    const nr = tr+dr, nc = tc+dc;
+    if(nr<0||nr>7||nc<0||nc>7) continue;
+    const idx = nr*8+nc;
+    if(removed.has(idx)) continue;
+    const p = board[nr][nc];
+    if(p && p.color===byColor && p.type==='k') return {r:nr,c:nc,value:PIECE_VALUES.k};
+  }
+  return null;
+}
+
+function see(engine, move) {
+  const board = engine.board;
+  const fr = move.from.r, fc = move.from.c;
+  const tr = move.to.r, tc = move.to.c;
+  const attacker = board[fr][fc];
+  if(!attacker) return 0;
+  let target;
+  if(move.to.enPassant) {
+    const capRow = attacker.color===WHITE ? tr+1 : tr-1;
+    target = board[capRow][tc];
+  } else {
+    target = board[tr][tc];
+  }
+  if(!target) return 0;
+  const removed = new Set();
+  removed.add(fr*8+fc);
+  if(move.to.enPassant) {
+    const capRow = attacker.color===WHITE ? tr+1 : tr-1;
+    removed.add(capRow*8+tc);
+  }
+  const gain = [PIECE_VALUES[target.type] || 0];
+  let lastVal = PIECE_VALUES[attacker.type] || 0;
+  let side = attacker.color===WHITE ? BLACK : WHITE;
+  let d = 0;
+  while(true) {
+    const next = findSmallestAttacker(board, tr, tc, side, removed);
+    if(!next) break;
+    d++;
+    gain[d] = lastVal - gain[d-1];
+    if(Math.max(-gain[d-1], gain[d]) < 0) break;
+    removed.add(next.r*8+next.c);
+    lastVal = next.value;
+    side = side===WHITE ? BLACK : WHITE;
+  }
+  while(d > 0) {
+    gain[d-1] = -Math.max(-gain[d-1], gain[d]);
+    d--;
+  }
+  return gain[0];
+}
+
 function tacticalBlunderPenalty(engine, side) {
   const enemy = engine.turn;
   let maxPenalty = 0;
@@ -721,14 +1025,27 @@ function quiescence(engine, alpha, beta, side, ctx, ply=0) {
   if(standPat > alpha) alpha = standPat;
   if(ply >= QUIESCENCE_CAP_DEPTH) return standPat;
 
-  const moves = orderedMoves(engine, engine.turn, ctx, ply).filter(move => {
-    const captured = getCapturePiece(engine, move);
-    const mover = engine.getPiece(move.from.r, move.from.c);
-    return !!captured || (mover && mover.type==='p' && (move.to.r===0 || move.to.r===7));
-  });
+  // Generate captures and promotions only; rank by SEE; skip losing captures.
+  const all = engine.getAllLegalMoves(engine.turn);
+  const scored = [];
+  for(const m of all) {
+    const cap = getCapturePiece(engine, m);
+    const mover = engine.getPiece(m.from.r, m.from.c);
+    const isPromo = !!(mover && mover.type==='p' && (m.to.r===0 || m.to.r===7));
+    if(!cap && !isPromo) continue;
+    let s;
+    if(cap) {
+      s = see(engine, m);
+      if(s < 0) continue; // skip losing captures
+    } else {
+      s = 800;
+    }
+    scored.push({m, s});
+  }
+  scored.sort((a,b) => b.s - a.s);
 
-  for(const move of moves) {
-    engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
+  for(const {m} of scored) {
+    engine.makeMove(m.from.r, m.from.c, m.to.r, m.to.c, m.to);
     const score = -quiescence(engine, -beta, -alpha, side, ctx, ply+1);
     engine.undoMove();
     if(ctx.timeUp) return alpha;
@@ -738,35 +1055,71 @@ function quiescence(engine, alpha, beta, side, ctx, ply=0) {
   return alpha;
 }
 
-function negamax(engine, depth, alpha, beta, side, ctx, ply=0) {
+function negamax(engine, depth, alpha, beta, side, ctx, ply=0, checkExtsUsed=0, allowNull=true) {
   if((++ctx.nodes & 511)===0 && performance.now() > ctx.deadline) {
     ctx.timeUp = true;
     return 0;
   }
 
-  const alphaOrig = alpha;
   const posKey = getPositionKey(engine);
+  let addedToPath = false;
+
+  // Repetition / 50-move draw (only away from root)
+  if(ply > 0) {
+    if(engine.halfmoveClock >= 100) return 0;
+    if(ctx.priorPositions && ctx.priorPositions.has(posKey)) return 0;
+    if(ctx.pathPositions.has(posKey)) return 0;
+    ctx.pathPositions.add(posKey);
+    addedToPath = true;
+  }
+
+  const cleanup = (val) => {
+    if(addedToPath) ctx.pathPositions.delete(posKey);
+    return val;
+  };
+
+  const alphaOrig = alpha;
   const ttEntry = ctx.tt.get(posKey);
   let ttMoveKey = '';
   if(ttEntry) {
     ttMoveKey = ttEntry.bestMoveKey || '';
     if(ttEntry.depth >= depth) {
-      if(ttEntry.flag===TT_EXACT) return ttEntry.score;
-      if(ttEntry.flag===TT_LOWER) alpha = Math.max(alpha, ttEntry.score);
-      else if(ttEntry.flag===TT_UPPER) beta = Math.min(beta, ttEntry.score);
-      if(alpha >= beta) return ttEntry.score;
+      const ttScore = ttEntry.score;
+      if(ttEntry.flag===TT_EXACT) return cleanup(ttScore);
+      if(ttEntry.flag===TT_LOWER) {
+        if(ttScore >= beta) return cleanup(ttScore);
+        alpha = Math.max(alpha, ttScore);
+      } else if(ttEntry.flag===TT_UPPER) {
+        if(ttScore <= alpha) return cleanup(ttScore);
+        beta = Math.min(beta, ttScore);
+      }
+      if(alpha >= beta) return cleanup(ttScore);
     }
   }
 
-  if(depth<=0) return quiescence(engine, alpha, beta, side, ctx, ply);
-  if(engine.isInsufficientMaterial()) return 0;
+  if(depth <= 0) return cleanup(quiescence(engine, alpha, beta, side, ctx, ply));
+  if(engine.isInsufficientMaterial()) return cleanup(0);
+
+  const inCheck = engine.isInCheck(engine.turn);
+
+  // Null Move Pruning
+  if(allowNull && !inCheck && depth >= NMP_MIN_DEPTH && ply > 0
+     && Math.abs(beta) < CHECKMATE_SCORE - 1000
+     && hasNonPawnMaterial(engine, engine.turn)) {
+    const savedEP = engine.enPassantTarget;
+    engine.enPassantTarget = null;
+    engine.turn = engine.turn===WHITE ? BLACK : WHITE;
+    const R = depth >= 6 ? 3 : 2;
+    const nullScore = -negamax(engine, depth - 1 - R, -beta, -beta + 1, side, ctx, ply + 1, checkExtsUsed, false);
+    engine.turn = engine.turn===WHITE ? BLACK : WHITE;
+    engine.enPassantTarget = savedEP;
+    if(!ctx.timeUp && nullScore >= beta) return cleanup(beta);
+  }
 
   const legalMoves = orderedMoves(engine, engine.turn, ctx, ply, ttMoveKey);
   if(!legalMoves.length) {
-    if(engine.isInCheck(engine.turn)) {
-      return engine.turn===side ? -CHECKMATE_SCORE + ply : CHECKMATE_SCORE - ply;
-    }
-    return 0;
+    if(inCheck) return cleanup(engine.turn===side ? -CHECKMATE_SCORE + ply : CHECKMATE_SCORE - ply);
+    return cleanup(0);
   }
 
   let bestScore = -Infinity;
@@ -775,38 +1128,43 @@ function negamax(engine, depth, alpha, beta, side, ctx, ply=0) {
     const move = legalMoves[moveIndex];
     const key = moveKey(move);
     const mover = engine.getPiece(move.from.r, move.from.c);
-    const quietMove = !!mover && isQuietMove(engine, move);
+    const isCap = !!getCapturePiece(engine, move);
+    const quietMove = !!mover && !isCap && !move.to.castle && !(mover.type==='p' && (move.to.r===0 || move.to.r===7));
     engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
-    let extension = engine.isInCheck(engine.turn) ? 1 : 0;
+    const givesCheck = engine.isInCheck(engine.turn);
+    let extension = 0;
+    if(givesCheck && checkExtsUsed < MAX_CHECK_EXTENSIONS) extension = 1;
     if(mover && mover.type==='p' && (move.to.r===0 || move.to.r===7 || move.to.r===1 || move.to.r===6)) extension = Math.max(extension, 1);
     const fullDepth = depth - 1 + extension;
+    const newCheckExts = checkExtsUsed + (givesCheck && extension > 0 ? 1 : 0);
     let searchDepth = fullDepth;
-    if(depth >= 3 && ply >= 2 && moveIndex >= 3 && quietMove && extension===0) {
+    if(depth >= 3 && ply >= 2 && moveIndex >= 3 && quietMove && extension===0 && !inCheck) {
       searchDepth = Math.max(0, fullDepth - 1);
+      if(moveIndex >= 6 && depth >= 5) searchDepth = Math.max(0, searchDepth - 1);
     }
     let score;
     if(moveIndex===0) {
-      score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply+1);
+      score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply + 1, newCheckExts, true);
     } else {
-      score = -negamax(engine, searchDepth, -alpha-1, -alpha, side, ctx, ply+1);
+      score = -negamax(engine, searchDepth, -alpha - 1, -alpha, side, ctx, ply + 1, newCheckExts, true);
       if(!ctx.timeUp && score > alpha && searchDepth !== fullDepth) {
-        score = -negamax(engine, fullDepth, -alpha-1, -alpha, side, ctx, ply+1);
+        score = -negamax(engine, fullDepth, -alpha - 1, -alpha, side, ctx, ply + 1, newCheckExts, true);
       }
       if(!ctx.timeUp && score > alpha && score < beta) {
-        score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply+1);
+        score = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, ply + 1, newCheckExts, true);
       }
     }
     engine.undoMove();
-    if(ctx.timeUp) return 0;
+    if(ctx.timeUp) return cleanup(0);
     if(score > bestScore) {
       bestScore = score;
       bestMoveKey = key;
     }
     if(score > alpha) alpha = score;
     if(alpha >= beta) {
-      if(!getCapturePiece(engine, move)) {
+      if(!isCap) {
         registerKiller(ctx, ply, key);
-        ctx.history[key] = Math.min(12000, (ctx.history[key] || 0) + depth * depth * 18);
+        ctx.history[key] = Math.min(8000, (ctx.history[key] || 0) + depth * depth);
       }
       break;
     }
@@ -816,7 +1174,7 @@ function negamax(engine, depth, alpha, beta, side, ctx, ply=0) {
   if(bestScore <= alphaOrig) flag = TT_UPPER;
   else if(bestScore >= beta) flag = TT_LOWER;
   ctx.tt.set(posKey, { depth, score: bestScore, flag, bestMoveKey });
-  return bestScore;
+  return cleanup(bestScore);
 }
 
 function pickEasyMove(engine, side) {
@@ -835,27 +1193,56 @@ function pickEasyMove(engine, side) {
 function pickMediumMove(engine, side) {
   const legal = orderedMoves(engine, side);
   if(!legal.length) return null;
-  const scored = [];
-  for(const move of legal) {
-    engine.makeMove(move.from.r, move.from.c, move.to.r, move.to.c, move.to);
-    const ctx = {
-      deadline: performance.now() + SEARCH_LIMITS.medium,
-      tt: new Map(),
-      killers: [],
-      history: Object.create(null),
-      nodes: 0,
-      timeUp: false
-    };
-    const reply = negamax(engine, 4, -Infinity, Infinity, side, ctx, 1);
-    let score = -reply;
-    if(!ctx.timeUp) {
-      score -= tacticalBlunderPenalty(engine, side);
+
+  const ctx = {
+    deadline: performance.now() + SEARCH_LIMITS.medium,
+    tt: new Map(),
+    killers: [],
+    history: Object.create(null),
+    nodes: 0,
+    timeUp: false,
+    priorPositions: engine.priorPositions || new Set(),
+    pathPositions: new Set()
+  };
+
+  let bestMove = legal[0];
+  let bestScore = -Infinity;
+
+  for(let depth = 3; depth <= 7; depth++) {
+    if(ctx.timeUp) break;
+    const rootMoves = [...legal];
+    rootMoves.sort((a, b) => {
+      if(moveKey(a)===moveKey(bestMove)) return -1;
+      if(moveKey(b)===moveKey(bestMove)) return 1;
+      return scoreMove(engine, b, ctx, 0) - scoreMove(engine, a, ctx, 0);
+    });
+
+    let alpha = -Infinity;
+    const beta = Infinity;
+    let localBest = rootMoves[0];
+    let localScore = -Infinity;
+
+    for(let i = 0; i < rootMoves.length; i++) {
+      const m = rootMoves[i];
+      const mover = engine.getPiece(m.from.r, m.from.c);
+      engine.makeMove(m.from.r, m.from.c, m.to.r, m.to.c, m.to);
+      let fullDepth = depth - 1;
+      if(mover && mover.type==='p' && (m.to.r===0 || m.to.r===7 || m.to.r===1 || m.to.r===6)) fullDepth += 1;
+      const s = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, 1, 0, true);
+      engine.undoMove();
+      if(ctx.timeUp) break;
+      if(s > localScore) {
+        localScore = s;
+        localBest = m;
+      }
+      if(s > alpha) alpha = s;
     }
-    engine.undoMove();
-    scored.push({ move, score });
+    if(!ctx.timeUp) {
+      bestMove = localBest;
+      bestScore = localScore;
+    }
   }
-  scored.sort((a,b) => b.score - a.score);
-  return scored[0]?.move || legal[0] || null;
+  return bestMove || legal[0];
 }
 
 function pickHardMove(engine, side) {
@@ -872,7 +1259,9 @@ function pickHardMove(engine, side) {
     killers: [],
     history: Object.create(null),
     nodes: 0,
-    timeUp: false
+    timeUp: false,
+    priorPositions: engine.priorPositions || new Set(),
+    pathPositions: new Set()
   };
 
   for(let depth=3; depth<=HARD_MAX_DEPTH; depth++) {
@@ -912,9 +1301,6 @@ function pickHardMove(engine, side) {
         if(!ctx.timeUp && result > alpha && result < beta) {
           result = -negamax(engine, fullDepth, -beta, -alpha, side, ctx, 1);
         }
-      }
-      if(!ctx.timeUp) {
-        result -= tacticalBlunderPenalty(engine, side);
       }
       engine.undoMove();
       if(ctx.timeUp) return bestMove;
