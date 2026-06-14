@@ -2776,6 +2776,18 @@ function renderHighlights() {
   lastMoveHighlights.forEach(sq => {
     addHighlight(sq.r, sq.c, 0xC0C0C0, 0.3, 'lastmove');
   });
+  // King in check — pulsing red danger glow (v9 A2)
+  try {
+    const _ce = (typeof chessFx !== 'undefined' && chessFx.reviewEngine) ? chessFx.reviewEngine : chessGame.engine;
+    [WHITE, BLACK].forEach(col => {
+      if(_ce.isInCheck(col)) {
+        for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+          const kp = _ce.getPiece(r,c);
+          if(kp && kp.type==='k' && kp.color===col) addHighlight(r, c, 0xFF2B2B, 0.55, 'check');
+        }
+      }
+    });
+  } catch(e) {}
   // Hint squares (from the «Подсказка» button) — distinct cyan tint.
   if(typeof chessFx !== 'undefined' && chessFx.hintSquares) {
     chessFx.hintSquares.forEach(sq => addHighlight(sq.r, sq.c, 0x7BE0FF, 0.5, 'hint'));
@@ -2925,6 +2937,7 @@ function applyResponsiveCameraPreset(force=false) {
 
 let rightClickStart = false;
 function onMouseDown(e) {
+  try { if(window.fxMateOrbit) window.fxMateOrbit=false; } catch(e){}
   if(chessGame.boardLocked) return;
   if(e.button===2) { isDragging=true; lastMouse={x:e.clientX,y:e.clientY}; rightClickStart=true; return; }
   rightClickStart=false;
@@ -2952,6 +2965,7 @@ function onWheel(e) {
 
 let touchStartPos = null, touchStartTime = 0;
 function onTouchStart(e) {
+  try { if(window.fxMateOrbit) window.fxMateOrbit=false; } catch(e){}
   e.preventDefault();
   if(e.touches.length===2) {
     pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
@@ -3117,6 +3131,7 @@ function executePlayerMove(fr,fc,tr,tc,move,promo) {
 
 function flashAndRemove(mesh) {
   if(!mesh) return;
+  try { fxCaptureBurst(mesh.position); } catch(e){}
   const startTime = performance.now();
   function update() {
     const t = (performance.now()-startTime)/300;
@@ -3131,6 +3146,41 @@ function flashAndRemove(mesh) {
   }
   if(mesh.material) mesh.material.transparent=true;
   requestAnimationFrame(update);
+}
+
+// v9 A3: golden spark burst when a piece is captured
+function fxCaptureBurst(pos) {
+  try {
+    if(typeof fxReducedMotion !== 'undefined' && fxReducedMotion) return;
+    if(typeof fxPerfMode !== 'undefined' && fxPerfMode) return;
+    if(!boardGroup || typeof THREE === 'undefined' || !pos) return;
+    const n = 14;
+    const geo = new THREE.SphereGeometry(0.05, 6, 6);
+    const parts = [];
+    for(let i=0;i<n;i++){
+      const mat = new THREE.MeshBasicMaterial({ color: (i%2?0xFFE07A:0xD4AF37), transparent:true, opacity:0.95, depthWrite:false });
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(pos.x, (pos.y||0.4)+0.3, pos.z);
+      const ang = Math.random()*Math.PI*2, sp = 0.04+Math.random()*0.06;
+      m.userData.vel = { x: Math.cos(ang)*sp, y: 0.06+Math.random()*0.06, z: Math.sin(ang)*sp };
+      boardGroup.add(m); parts.push(m);
+    }
+    const start = performance.now();
+    function step(){
+      const t = (performance.now()-start)/650;
+      if(t>=1){ parts.forEach(p=>{ boardGroup.remove(p); if(p.material) p.material.dispose(); }); geo.dispose(); return; }
+      parts.forEach(p=>{
+        p.position.x += p.userData.vel.x;
+        p.position.y += p.userData.vel.y;
+        p.position.z += p.userData.vel.z;
+        p.userData.vel.y -= 0.008;
+        if(p.material) p.material.opacity = 0.95*(1-t);
+        p.scale.setScalar(Math.max(0.05, 1-t*0.6));
+      });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  } catch(e) {}
 }
 
 // ============================================================
@@ -3196,6 +3246,8 @@ function performAIMove(best, options={}) {
       isAnimating = false;
       return;
     }
+    const _capKey = `${best.to.r},${best.to.c}`;
+    if(pieceObjects[_capKey] && _capKey !== `${best.from.r},${best.from.c}`) { flashAndRemove(pieceObjects[_capKey]); delete pieceObjects[_capKey]; }
     engine.makeMove(best.from.r,best.from.c,best.to.r,best.to.c,best.to,forcePromotion);
     saveClockSnapshot();
     lastMoveHighlights=[{r:best.from.r,c:best.from.c},{r:best.to.r,c:best.to.c}];
@@ -3318,7 +3370,7 @@ function parseSfInfo(line) {
 
 // Run a single engine job. Any in-flight job is cancelled and the engine is
 // drained to idle first, so only one search is ever active on the worker.
-async function sfRunJob(fen, goCmd, { skill = 20, onInfo = null, timeoutMs = 12000 } = {}) {
+async function sfRunJob(fen, goCmd, { skill = 20, onInfo = null, timeoutMs = 12000, contempt = null } = {}) {
   const w = stockfish.worker;
   if(!w) return null;
   if(stockfish.current && !stockfish.current.settled) {
@@ -3351,6 +3403,7 @@ async function sfRunJob(fen, goCmd, { skill = 20, onInfo = null, timeoutMs = 120
     };
     try {
       w.postMessage('setoption name Skill Level value ' + skill);
+      if(contempt !== null && contempt !== undefined) { try { w.postMessage('setoption name Contempt value ' + contempt); } catch(e){} }
       w.postMessage('position fen ' + fen);
       w.postMessage(goCmd);
     } catch(e) { finish(null); }
@@ -3361,7 +3414,8 @@ async function stockfishBestMove(fen, opts) {
   const skill = (opts && typeof opts.skill === 'number') ? opts.skill : 20;
   const movetime = (opts && typeof opts.movetime === 'number') ? opts.movetime : 2000;
   const onInfo = (opts && opts.onInfo) || null;
-  const r = await sfRunJob(fen, 'go movetime ' + movetime, { skill, onInfo, timeoutMs: movetime + 9000 });
+  const contempt = (opts && typeof opts.contempt === 'number') ? opts.contempt : null;
+  const r = await sfRunJob(fen, 'go movetime ' + movetime, { skill, onInfo, contempt, timeoutMs: movetime + 9000 });
   return r ? r.best : null;
 }
 
@@ -3376,9 +3430,9 @@ async function stockfishAnalyze(fen, opts) {
 
 // Strength per level: «Сложно» = full strength (~10x), «Стандарт» = limited (~2x).
 const STOCKFISH_SETTINGS = {
-  medium: { skill: 13, movetime: 1500 },
-  hard:   { skill: 20, movetime: 4000 },
-  master: { skill: 20, movetime: 8000 }
+  medium: { skill: 13, movetime: 1500, contempt: 0 },
+  hard:   { skill: 20, movetime: 4000, contempt: 14 },
+  master: { skill: 20, movetime: 9000, contempt: 30 }
 };
 
 function engineToFullFEN(engine) {
@@ -3481,6 +3535,56 @@ function fxBookMove() {
     return null;
   } catch(e) { return null; }
 }
+async function fxFetchJSON(url, timeoutMs) {
+  try {
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const t = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch(e){} }, timeoutMs || 2500) : null;
+    const res = await fetch(url, ctrl ? { signal: ctrl.signal } : {});
+    if(t) clearTimeout(t);
+    if(!res || !res.ok) return null;
+    return await res.json();
+  } catch(e) { return null; }
+}
+function fxCountPieces() {
+  const e = chessGame.engine; let n = 0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(e.getPiece(r,c)) n++;
+  return n;
+}
+// B1: perfect endgame play via Lichess Syzygy tablebase (<=7 pieces).
+async function fxTablebaseMove() {
+  try {
+    if(fxCountPieces() > 7) return null;
+    const engine = chessGame.engine;
+    const side = engine.turn;
+    const fen = engineToFullFEN(engine);
+    const data = await fxFetchJSON('https://tablebase.lichess.ovh/standard?fen=' + encodeURIComponent(fen), 2800);
+    if(!data || !data.moves || !data.moves.length) return null;
+    const uci = data.moves[0].uci;
+    if(!uci) return null;
+    const parsed = uciToGameMove(engine, side, uci);
+    return parsed ? parsed.move : null;
+  } catch(e) { return null; }
+}
+// B2: stronger, more varied opening play via Lichess masters explorer.
+async function fxOnlineBookMove() {
+  try {
+    const engine = chessGame.engine;
+    if((engine.moveHistory || []).length >= 16) return null;
+    const side = engine.turn;
+    const fen = engineToFullFEN(engine);
+    const data = await fxFetchJSON('https://explorer.lichess.ovh/masters?fen=' + encodeURIComponent(fen) + '&topGames=0&moves=8', 2500);
+    if(!data || !data.moves || !data.moves.length) return null;
+    const top = data.moves.slice(0, 4).filter(m => m && m.uci);
+    if(!top.length) return null;
+    const weights = top.map(m => Math.max(1, (m.white||0)+(m.draws||0)+(m.black||0)));
+    const total = weights.reduce((a,b)=>a+b,0);
+    let pick = Math.random() * total, idx = 0;
+    for(let i=0;i<weights.length;i++){ pick -= weights[i]; if(pick<=0){ idx=i; break; } }
+    const uci = top[idx].uci;
+    const parsed = uciToGameMove(engine, side, uci);
+    return parsed ? parsed.move : null;
+  } catch(e) { return null; }
+}
 async function getStockfishGameMove(difficulty) {
   const ok = await loadStockfish();
   if(!ok) return null;
@@ -3489,7 +3593,7 @@ async function getStockfishGameMove(difficulty) {
   const cfg = fxStrengthFor(difficulty);
   const mt = fxAdaptiveMovetime(engine, side, cfg.movetime);
   const fen = engineToFullFEN(engine);
-  const uci = await stockfishBestMove(fen, { skill: cfg.skill, movetime: mt, onInfo: fxThinkOnInfo });
+  const uci = await stockfishBestMove(fen, { skill: cfg.skill, movetime: mt, contempt: cfg.contempt, onInfo: fxThinkOnInfo });
   fxClearThinking();
   if(!uci) return null;
   return uciToGameMove(engine, side, uci);
@@ -3746,6 +3850,50 @@ async function fxRequestEval() {
   chessFx.lastEval = w;
   fxSetEvalDisplay(w);
   fxBlunderCheck(w);
+  try { fxMaybeResign(w); } catch(e) {}
+}
+
+// v9 B4: AI concedes a hopeless position like a human (very conservative).
+function fxMaybeResign(w) {
+  try {
+    if(isGameOverFlag || chessGame.localTwoPlayer || chessGame.p2pActive) return;
+    if(chessGame.difficulty === 'easy' || chessGame.trainingMatch) return;
+    const aiWhite = (getAISide() === WHITE);
+    let lost = false;
+    if(w.mate != null) {
+      if(aiWhite && w.mate < 0) lost = true;
+      if(!aiWhite && w.mate > 0) lost = true;
+    } else if(typeof w.cp === 'number') {
+      const aiCp = aiWhite ? w.cp : -w.cp;
+      if(aiCp < -1800) lost = true;
+    }
+    chessFx._resignStreak = lost ? (chessFx._resignStreak||0) + 1 : 0;
+    if(chessFx._resignStreak >= 3 && !isGameOverFlag) {
+      chessFx._resignStreak = 0;
+      isGameOverFlag = true;
+      try { addChatMessage('system', 'ИИ сдаётся. Поздравляю с победой!'); } catch(e){}
+      showGameOver('ИИ СДАЁТСЯ', 'Позиция безнадёжна — вы победили!');
+    }
+  } catch(e) {}
+}
+
+// v9 B3: announce tactical threats from the move just made.
+function fxAnnounceThreats() {
+  try {
+    if(isGameOverFlag) return;
+    const engine = chessGame.engine;
+    const enemy = engine.turn;
+    const mover = (enemy === WHITE) ? BLACK : WHITE;
+    let q = 0, rk = 0;
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = engine.getPiece(r,c);
+      if(!p || p.color !== enemy) continue;
+      if(p.type==='q' && engine.isSquareAttacked(r,c,mover)) q++;
+      else if(p.type==='r' && engine.isSquareAttacked(r,c,mover)) rk++;
+    }
+    if(q + rk >= 2) fxToast('⚔️ Двойной удар!', 1500);
+    else if(q >= 1) fxToast('⚠️ Угроза ферзю', 1300);
+  } catch(e) {}
 }
 
 function fxBlunderCheck(w) {
@@ -4141,6 +4289,7 @@ function fxAfterMove() {
       else if(/x/.test(last)) fxVibrate(22);
     } catch(e) {}
     if(chessGame.localTwoPlayer && !isGameOverFlag) { try { fxHotseatPostMove(); } catch(e) {} }
+    if(!isGameOverFlag) { try { fxAnnounceThreats(); } catch(e) {} }
     if(isGameOverFlag) { fxPostGame(); return; }
     fxRequestEval();
   } catch(e) { try { console.warn('[chess] fxAfterMove error', e); } catch(_){} }
@@ -4416,8 +4565,17 @@ async function doAIMove(expectedToken=aiMoveRequestToken) {
   try {
     // Primary engine: Stockfish for «Стандарт»/«Сложно» (skipped in tutorial).
     if(!chessGame.trainingMatch && (requestedDifficulty==='medium' || requestedDifficulty==='hard' || requestedDifficulty==='master')) {
-      const bk = fxBookMove();
-      if(bk) { best = bk; bestPromo = 'q'; }
+      if(requestedDifficulty==='hard' || requestedDifficulty==='master') {
+        const tb = await fxTablebaseMove();
+        if(guardsFail()) { setAIThinking(false); return; }
+        if(tb) { best = tb; bestPromo = 'q'; }
+      }
+      if(!best) {
+        const ob = await fxOnlineBookMove();
+        if(guardsFail()) { setAIThinking(false); return; }
+        if(ob) { best = ob; bestPromo = 'q'; }
+      }
+      if(!best) { const bk = fxBookMove(); if(bk) { best = bk; bestPromo = 'q'; } }
       if(!best) {
         const sf = await getStockfishGameMove(requestedDifficulty);
         if(guardsFail()) { setAIThinking(false); return; }
@@ -4483,6 +4641,7 @@ function showGameOver(title, desc) {
   _goOv.style.display='flex';
   try { const bx = document.getElementById('gameover-box'); if(bx) { bx.classList.remove('fx-pop'); void bx.offsetWidth; bx.classList.add('fx-pop'); } } catch(e) {}
   try { if(!(title.indexOf('НИЧЬ') >= 0 || title.indexOf('ПАТ') >= 0) && !(typeof fxReducedMotion !== 'undefined' && fxReducedMotion)) fxConfetti(); } catch(e) {}
+  try { if(!(title.indexOf('НИЧЬ')>=0||title.indexOf('ПАТ')>=0) && !(typeof fxReducedMotion!=='undefined'&&fxReducedMotion)) { window._mateTheta=(typeof camTheta!=='undefined')?camTheta:0; window._mateOrbitStart=(typeof performance!=='undefined'?performance.now():Date.now()); window.fxMateOrbit=true; } } catch(e){}
 }
 
 function fxConfetti() {
@@ -5735,6 +5894,17 @@ function animate(ts) {
   if(!fxReducedMotion) {
     // Gentle board float
     if(boardGroup) boardGroup.position.y=Math.sin(time*0.3)*0.03;
+    if(window.fxMateOrbit && camera) {
+      if((typeof performance!=='undefined'?performance.now():Date.now()) - (window._mateOrbitStart||0) > 6500) { window.fxMateOrbit = false; }
+      else {
+        window._mateTheta = (window._mateTheta||0) + 0.004;
+        const _mp = 1.0, _mr = camRadius || 12;
+        camera.position.x = _mr*Math.sin(_mp)*Math.sin(window._mateTheta);
+        camera.position.y = _mr*Math.cos(_mp);
+        camera.position.z = _mr*Math.sin(_mp)*Math.cos(window._mateTheta);
+        camera.lookAt(0,0,0);
+      }
+    }
     // Animate selected piece hover
     if(selectedSquare) {
       const key=`${selectedSquare.r},${selectedSquare.c}`;
@@ -5749,6 +5919,7 @@ function animate(ts) {
     highlightObjects.forEach((h,i)=>{
       if(h.userData.highlightType==='legal') h.material.opacity=0.5+Math.sin(time*3+i)*0.3;
       if(h.userData.highlightType==='selected') h.material.opacity=0.5+Math.sin(time*4)*0.2;
+      if(h.userData.highlightType==='check') h.material.opacity=0.4+Math.abs(Math.sin(time*5))*0.45;
       if(h.userData.highlightType==='tutorial') {
         h.material.opacity = 0.34 + Math.sin(time * 4.6 + i) * 0.2;
         const baseScale = 1.0 + Math.sin(time * 3.7 + i) * 0.06;
@@ -6049,8 +6220,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 <style id="fx-v8-mobile">
   /* v8: dedicated phone layout — declutter chrome so the board owns the screen */
   @media (max-width: 768px) {
-    /* Camera-angle buttons hidden: rotate/zoom works via drag + pinch */
-    .mode-btns { display: none !important; }
+    /* Camera-angle buttons: kept on phone, just compact icons */
+    .mode-btns { display: flex !important; gap: 4px !important; flex: 0 0 auto !important; }
+    .mode-btns .icon-btn { width: 30px !important; height: 30px !important; min-width: 30px !important; padding: 0 !important; }
+    .mode-btns .icon-btn.icon-btn-text { font-size: 0.58rem !important; }
+    .mode-btns .icon-btn svg { width: 15px !important; height: 15px !important; }
     /* Slim top bar */
     #topbar { padding: 7px 11px !important; gap: 5px !important; }
     #topbar .logo { font-size: 0.8rem !important; letter-spacing: 1px !important; }
@@ -6066,12 +6240,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
     .diff-btn .diff-elo { display: none !important; }
     /* Bottom controls: 3 columns -> 6 buttons fit in 2 short rows, freeing board height */
     #action-btns { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; bottom: calc(8px + var(--safe-bottom)) !important; }
-    .action-btn { min-height: 40px !important; padding: 7px 5px !important; font-size: 0.64rem !important; letter-spacing: 0.2px !important; }
+    .action-btn { min-height: 42px !important; padding: 6px 4px !important; font-size: 0.63rem !important; letter-spacing: 0.1px !important; text-align: center !important; white-space: normal !important; line-height: 1.12 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
     /* Lift the floating chat/menu pill so it clears the 2-row control grid */
     #chat-toggle-btn { bottom: calc(108px + var(--safe-bottom)) !important; }
   }
 </style>
 
+<div id="fx-vignette" aria-hidden="true"></div>
+<style id="fx-v9-style">
+  #fx-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 3; background: radial-gradient(ellipse at 50% 46%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.34) 84%, rgba(0,0,0,0.6) 100%); }
+  body.fx-perf #fx-vignette { display: none; }
+</style>
 </body>
 </html>
 
