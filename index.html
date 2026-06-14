@@ -2837,8 +2837,16 @@ function getDefaultCameraState() {
     const preset = CAMERA_PRESETS[presetKey];
     return { theta, phi: preset.phi, radius: isMobile ? preset.radiusMobile : preset.radiusDesktop };
   }
-  if(isMobile && isPortrait) return { theta, phi: 1.12, radius: 15.8 };
-  if(isMobile) return { theta, phi: 1.02, radius: 13.4 };
+  if(isMobile) {
+    const aspect = window.innerWidth / window.innerHeight;
+    const fovHalf = (50 * Math.PI / 180) / 2;
+    const tanV = Math.tan(fovHalf);
+    const tanH = tanV * aspect;
+    const margin = isPortrait ? 1.12 : 1.15;
+    let fit = (4 * margin) / Math.min(tanH, tanV);
+    fit = Math.max(8.5, Math.min(22, fit));
+    return { theta, phi: isPortrait ? 1.12 : 1.02, radius: fit };
+  }
   return { theta, phi: Math.PI / 3.5, radius: 11 };
 }
 
@@ -6035,6 +6043,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
     #fx-move-list { max-height: 160px !important; }
     .action-btn { min-height: 46px !important; font-size: 0.72rem !important; }
     #fx-think { font-size: 0.78rem !important; }
+  }
+</style>
+
+<style id="fx-v8-mobile">
+  /* v8: dedicated phone layout — declutter chrome so the board owns the screen */
+  @media (max-width: 768px) {
+    /* Camera-angle buttons hidden: rotate/zoom works via drag + pinch */
+    .mode-btns { display: none !important; }
+    /* Slim top bar */
+    #topbar { padding: 7px 11px !important; gap: 5px !important; }
+    #topbar .logo { font-size: 0.8rem !important; letter-spacing: 1px !important; }
+    #topbar .status { font-size: 0.74rem !important; }
+    .topbar-actions { gap: 6px !important; align-items: center !important; }
+    .topbar-link-btn { padding: 4px 9px !important; font-size: 0.62rem !important; white-space: nowrap !important; }
+    .mobile-clock-pill { padding: 4px 7px !important; }
+    .mobile-clock-time { font-size: 0.72rem !important; }
+    .mobile-topbar-score { padding: 3px 8px !important; }
+    /* Difficulty: one compact pill row, drop the ELO sub-label to keep it single-line */
+    .difficulty-btns { gap: 5px !important; }
+    .diff-btn { min-height: 34px !important; padding: 5px 4px !important; font-size: 0.64rem !important; line-height: 1.1 !important; }
+    .diff-btn .diff-elo { display: none !important; }
+    /* Bottom controls: 3 columns -> 6 buttons fit in 2 short rows, freeing board height */
+    #action-btns { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; bottom: calc(8px + var(--safe-bottom)) !important; }
+    .action-btn { min-height: 40px !important; padding: 7px 5px !important; font-size: 0.64rem !important; letter-spacing: 0.2px !important; }
+    /* Lift the floating chat/menu pill so it clears the 2-row control grid */
+    #chat-toggle-btn { bottom: calc(108px + var(--safe-bottom)) !important; }
   }
 </style>
 
