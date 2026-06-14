@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Шахматы — Viora Studio</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Crect x='3' y='3' width='58' height='58' rx='12' fill='none' stroke='%23D4AF37' stroke-width='2'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' fill='%23D4AF37'%3E%E2%99%94%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' fill='%23D4AF37'%3E%E2%99%94%3C/text%3E%3C/svg%3E">
 <style>
   :root {
     --gold: #D4AF37;
@@ -1237,6 +1239,7 @@
       <button class="diff-btn active" onclick="setDifficulty('easy')" id="btn-easy">Легко<span class="diff-elo">~800</span></button>
       <button class="diff-btn" onclick="setDifficulty('medium')" id="btn-medium">Стандарт<span class="diff-elo">~1700</span></button>
       <button class="diff-btn" onclick="setDifficulty('hard')" id="btn-hard">Сложно<span class="diff-elo">~2500+</span></button>
+      <button class="diff-btn" onclick="setDifficulty('master')" id="btn-master">ГМ<span class="diff-elo">~2900</span></button>
     </div>
   </div>
 </div>
@@ -1295,7 +1298,7 @@
   <div id="chat-header">
     <span>ИИ-соперник</span>
     <div id="chat-header-controls">
-      <span style="color:#555;font-size:0.7rem" id="ai-model-label">mistral-tiny</span>
+      <span style="color:#7a6a2a;font-size:0.7rem" id="ai-model-label"></span>
       <button class="chat-header-btn" type="button" onclick="hideChatCompletely()">Скрыть</button>
     </div>
   </div>
@@ -1305,6 +1308,7 @@
       <span id="fx-eval-label">0.0</span>
     </div>
     <div id="fx-opening"></div>
+    <div id="fx-think" style="display:none;color:#8fd0ff;font-size:0.72rem;font-family:monospace;line-height:1.3;padding:2px 0;word-break:break-all;"></div>
     <div id="fx-dock-tools">
       <button class="fx-tool-btn" id="fx-hint-btn" type="button">💡 Подсказка</button>
       <button class="fx-tool-btn" id="fx-copy-pgn" type="button">PGN</button>
@@ -3220,9 +3224,10 @@ function loadStockfish() {
       if(!res.ok) throw new Error('stockfish.js HTTP ' + res.status);
       let src = await res.text();
       // The build resolves stockfish.wasm relative to itself; point it at the CDN.
-      src = src.replace('locateFile:function(file){return file}',
-        'locateFile:function(file){return ' + JSON.stringify(STOCKFISH_BASE) + '+file}');
-      if(src.indexOf(STOCKFISH_BASE) === -1) throw new Error('locateFile patch failed');
+      const _sfNeedle = 'locateFile:function(file){return file}';
+      if(src.indexOf(_sfNeedle) !== -1) {
+        src = src.replace(_sfNeedle, 'locateFile:function(file){return ' + JSON.stringify(STOCKFISH_BASE) + '+file}');
+      }
       const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
       const w = new Worker(url);
       w.onmessage = (e) => {
@@ -3235,15 +3240,16 @@ function loadStockfish() {
       };
       stockfish.worker = w;
       await stockfishHandshake(w);
+      try { w.postMessage('setoption name Hash value 128'); w.postMessage('setoption name Contempt value 18'); } catch(e) {}
       stockfish.status = 'ready';
       try { console.info('[chess] Stockfish ready (engine active for Стандарт/Сложно)'); } catch(_){}
-      setAIModelLabel(shouldUseMistral() ? 'Stockfish + mistral' : 'Stockfish 10');
+      setAIModelLabel('Stockfish 10');
       return true;
     } catch(e) {
       stockfish.status = 'failed';
       if(stockfish.worker) { try { stockfish.worker.terminate(); } catch(_){} stockfish.worker = null; }
       try { console.warn('[chess] Stockfish unavailable, using built-in engine:', e && e.message); } catch(_){}
-      setAIModelLabel(shouldUseMistral() ? 'local engine + mistral' : 'local engine');
+      setAIModelLabel('Резервный движок');
       return false;
     }
   })();
@@ -3283,9 +3289,11 @@ function parseSfInfo(line) {
   const mate = line.match(/score mate (-?\d+)/);
   if(cp) out.cp = parseInt(cp[1], 10);
   if(mate) out.mate = parseInt(mate[1], 10);
+  const dp = line.match(/ depth (\d+)/);
+  if(dp) out.depth = parseInt(dp[1], 10);
   const pv = line.match(/ pv (.+)$/);
   if(pv) out.pv = pv[1].trim().split(/\s+/);
-  return (out.cp !== undefined || out.mate !== undefined) ? out : null;
+  return (out.cp !== undefined || out.mate !== undefined || out.depth !== undefined) ? out : null;
 }
 
 // Run a single engine job. Any in-flight job is cancelled and the engine is
@@ -3332,7 +3340,8 @@ async function sfRunJob(fen, goCmd, { skill = 20, onInfo = null, timeoutMs = 120
 async function stockfishBestMove(fen, opts) {
   const skill = (opts && typeof opts.skill === 'number') ? opts.skill : 20;
   const movetime = (opts && typeof opts.movetime === 'number') ? opts.movetime : 2000;
-  const r = await sfRunJob(fen, 'go movetime ' + movetime, { skill, timeoutMs: movetime + 8000 });
+  const onInfo = (opts && opts.onInfo) || null;
+  const r = await sfRunJob(fen, 'go movetime ' + movetime, { skill, onInfo, timeoutMs: movetime + 9000 });
   return r ? r.best : null;
 }
 
@@ -3347,8 +3356,9 @@ async function stockfishAnalyze(fen, opts) {
 
 // Strength per level: «Сложно» = full strength (~10x), «Стандарт» = limited (~2x).
 const STOCKFISH_SETTINGS = {
-  medium: { skill: 9, movetime: 1100 },
-  hard:   { skill: 20, movetime: 3000 }
+  medium: { skill: 13, movetime: 1500 },
+  hard:   { skill: 20, movetime: 4000 },
+  master: { skill: 20, movetime: 8000 }
 };
 
 function engineToFullFEN(engine) {
@@ -3379,14 +3389,88 @@ function uciToGameMove(engine, side, uci) {
   return move ? { move, promo } : null;
 }
 
+let fxThinkLast = 0;
+function fxThinkOnInfo(info) {
+  if(!info) return;
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  if(now - fxThinkLast < 280) return;
+  fxThinkLast = now;
+  const el = document.getElementById('fx-think');
+  if(!el) return;
+  let s = '';
+  if(info.depth) s += '\u0433\u043b\u0443\u0431\u0438\u043d\u0430 ' + info.depth;
+  if(info.pv && info.pv.length) s += (s ? ' \u00b7 ' : '') + info.pv.slice(0, 5).join(' ');
+  if(s) { el.textContent = '\ud83e\udde0 ' + s; el.style.display = 'block'; }
+}
+function fxClearThinking() {
+  const el = document.getElementById('fx-think');
+  if(el) { el.textContent = ''; el.style.display = 'none'; }
+}
+function fxAdaptiveMovetime(engine, side, base) {
+  try {
+    let mult = 1;
+    if(engine.isInCheck(side)) mult += 0.4;
+    let pieces = 0;
+    for(let r = 0; r < 8; r++) for(let c = 0; c < 8; c++) if(engine.getPiece(r, c)) pieces++;
+    let caps = 0;
+    const legal = engine.getAllLegalMoves(side) || [];
+    for(const m of legal) if(engine.getPiece(m.to.r, m.to.c)) caps++;
+    if(caps >= 4) mult += 0.25;
+    if(pieces <= 12) mult += 0.3;
+    mult = Math.min(mult, 1.8);
+    return Math.round(base * mult);
+  } catch(e) { return base; }
+}
+const FX_BOOK = {
+  '': ['e2e4', 'd2d4', 'c2c4', 'g1f3'],
+  'e2e4': ['e7e5', 'c7c5', 'e7e6', 'c7c6', 'd7d5'],
+  'd2d4': ['d7d5', 'g8f6', 'e7e6'],
+  'c2c4': ['e7e5', 'g8f6', 'c7c5'],
+  'g1f3': ['d7d5', 'g8f6', 'c7c5'],
+  'e2e4 e7e5': ['g1f3', 'f1c4', 'b1c3'],
+  'e2e4 c7c5': ['g1f3', 'b1c3', 'c2c3'],
+  'e2e4 e7e6': ['d2d4', 'd2d3'],
+  'e2e4 c7c6': ['d2d4', 'b1c3'],
+  'e2e4 d7d5': ['e4d5', 'b1c3'],
+  'd2d4 d7d5': ['c2c4', 'g1f3'],
+  'd2d4 g8f6': ['c2c4', 'g1f3'],
+  'c2c4 e7e5': ['b1c3', 'g1f3'],
+  'g1f3 d7d5': ['d2d4', 'g2g3'],
+  'e2e4 e7e5 g1f3': ['b8c6', 'g8f6'],
+  'e2e4 e7e5 g1f3 b8c6': ['f1b5', 'f1c4', 'd2d4'],
+  'e2e4 c7c5 g1f3': ['d7d6', 'b8c6', 'e7e6'],
+  'd2d4 d7d5 c2c4': ['e7e6', 'c7c6', 'd5c4'],
+  'd2d4 g8f6 c2c4': ['e7e6', 'g7g6'],
+  'd2d4 d7d5 c2c4 e7e6': ['b1c3', 'g1f3'],
+  'e2e4 e7e5 g1f3 b8c6 f1b5': ['a7a6', 'g8f6']
+};
+function fxBookMove() {
+  try {
+    const hist = chessGame.engine.moveHistory || [];
+    if(hist.length >= 8) return null;
+    const seq = fxUciSeq().join(' ');
+    const cands = FX_BOOK[seq];
+    if(!cands || !cands.length) return null;
+    const engine = chessGame.engine;
+    const side = engine.turn;
+    const order = cands.slice().sort(() => Math.random() - 0.5);
+    for(const uci of order) {
+      const parsed = uciToGameMove(engine, side, uci);
+      if(parsed) return parsed.move;
+    }
+    return null;
+  } catch(e) { return null; }
+}
 async function getStockfishGameMove(difficulty) {
   const ok = await loadStockfish();
   if(!ok) return null;
   const engine = chessGame.engine;
   const side = engine.turn;
   const cfg = fxStrengthFor(difficulty);
+  const mt = fxAdaptiveMovetime(engine, side, cfg.movetime);
   const fen = engineToFullFEN(engine);
-  const uci = await stockfishBestMove(fen, cfg);
+  const uci = await stockfishBestMove(fen, { skill: cfg.skill, movetime: mt, onInfo: fxThinkOnInfo });
+  fxClearThinking();
   if(!uci) return null;
   return uciToGameMove(engine, side, uci);
 }
@@ -4049,6 +4133,8 @@ function fxOnNewGame() {
     try { fxClearArrow(); } catch(e) {}
     chessFx.reviewEngine = null; chessFx.reviewPly = null;
     try { fxReviewUpdateLabel(); } catch(e) {}
+    try { fxClearThinking(); } catch(e) {}
+    try { if(stockfish.worker && stockfish.status === 'ready') { stockfish.worker.postMessage('ucinewgame'); stockfish.worker.postMessage('isready'); } } catch(e) {}
     chessFx.evalToken++;
     const rv = document.getElementById('fx-review'); if(rv) rv.style.display = 'none';
     fxRenderMoveList(); fxRenderOpening(); fxSetEvalDisplay(null);
@@ -4300,7 +4386,7 @@ async function doAIMove(expectedToken=aiMoveRequestToken) {
   await new Promise(r=>setTimeout(r,waitMs));
   if(isGameOverFlag || expectedToken!==aiMoveRequestToken || !isAITurn()) return;
   const requestedDifficulty = chessGame.trainingMatch ? 'easy' : chessGame.difficulty;
-  const fallbackDifficulty = requestedDifficulty==='hard' ? 'medium' : requestedDifficulty;
+  const fallbackDifficulty = requestedDifficulty==='hard' ? 'medium' : (requestedDifficulty==='master' ? 'hard' : requestedDifficulty);
   setAIThinking(true);
 
   let best = null;
@@ -4309,10 +4395,14 @@ async function doAIMove(expectedToken=aiMoveRequestToken) {
 
   try {
     // Primary engine: Stockfish for «Стандарт»/«Сложно» (skipped in tutorial).
-    if(!chessGame.trainingMatch && (requestedDifficulty==='medium' || requestedDifficulty==='hard')) {
-      const sf = await getStockfishGameMove(requestedDifficulty);
-      if(guardsFail()) { setAIThinking(false); return; }
-      if(sf) { best = sf.move; bestPromo = sf.promo; }
+    if(!chessGame.trainingMatch && (requestedDifficulty==='medium' || requestedDifficulty==='hard' || requestedDifficulty==='master')) {
+      const bk = fxBookMove();
+      if(bk) { best = bk; bestPromo = 'q'; }
+      if(!best) {
+        const sf = await getStockfishGameMove(requestedDifficulty);
+        if(guardsFail()) { setAIThinking(false); return; }
+        if(sf) { best = sf.move; bestPromo = sf.promo; }
+      }
     }
     // Fallback 1: the JS worker engine (also handles «Легко» + tutorial).
     if(!best) {
@@ -4452,7 +4542,7 @@ function initHelperWorker() {
     helperRequests.forEach(request => request.reject(error));
     helperRequests.clear();
     helperWorker = null;
-    setAIModelLabel('local engine');
+    setAIModelLabel('');
   });
   return helperWorker;
 }
@@ -4855,13 +4945,25 @@ function tickTournamentClock() {
   }
 }
 
+let fxClockAcc = 0, fxClockPrev = 0;
+function fxClockTick(ts) {
+  if(!chessGame.clockRunning || isGameOverFlag || isAnimating) { fxClockPrev = 0; return; }
+  const now = ts || performance.now();
+  if(!fxClockPrev) { fxClockPrev = now; return; }
+  const dt = now - fxClockPrev;
+  fxClockPrev = now;
+  if(dt <= 0 || dt > 2000) return;
+  const side = chessGame.engine.turn;
+  chessGame.clocks[side] = Math.max(0, chessGame.clocks[side] - dt);
+  fxClockAcc += dt;
+  if(fxClockAcc >= 200) { fxClockAcc = 0; try { updateTournamentDisplay(); } catch(e) {} }
+  if(chessGame.clocks[side] <= 0) { chessGame.clockRunning = false; try { updateTournamentDisplay(); } catch(e) {} try { executeTimedOutMove(side); } catch(e) {} }
+}
+
 function syncTournamentClock() {
   stopTournamentClock();
   updateTournamentDisplay();
-  if(chessGame.clockRunning && !isGameOverFlag && !isAnimating) {
-    chessGame.lastClockTick = performance.now();
-    tournamentClockInterval = setInterval(tickTournamentClock, 200);
-  }
+  fxClockPrev = 0; fxClockAcc = 0;
 }
 
 function toggleTournamentMode(enabled) {
@@ -4985,13 +5087,11 @@ async function callMistral(messages, retries=0) {
     const data=await res.json();
     mistralState.failStreak = 0;
     mistralState.cooldownUntil = 0;
-    setAIModelLabel('local engine + mistral');
     return cleanMarkdown(data.choices[0]?.message?.content || '');
   } catch(e) {
     mistralState.failStreak += 1;
     if(mistralState.failStreak >= 2) {
       mistralState.cooldownUntil = Date.now() + MISTRAL_COOLDOWN_MS;
-      setAIModelLabel('local engine');
     }
     if(retries<1){currentKeyIdx=(currentKeyIdx+1)%API_KEYS.length;return callMistral(messages,retries+1);}
     return null;
@@ -5090,7 +5190,7 @@ function setDifficulty(d) {
   document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`btn-${d}`).classList.add('active');
   saveGame();
-  addChatMessage('system',`Сложность изменена: ${d==='easy'?'Лёгкая':d==='medium'?'Стандарт':'Сложная'}`);
+  addChatMessage('system',`Сложность изменена: ${d==='easy'?'Лёгкая':d==='medium'?'Стандарт':d==='master'?'Гроссмейстер':'Сложная'}`);
   prewarmStockfish();
   try { fxSetSkillOverride(null); } catch(e) {}
 }
@@ -5608,8 +5708,9 @@ function animate(ts) {
   fxRafId = requestAnimationFrame(animate);
   if(fxRenderPaused || document.hidden) return;
   ts = ts || (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  // Idle throttle: ~30fps when nothing interactive; full fps while busy.
-  if(!fxSceneBusy()) { fxIdleTick ^= 1; if(fxIdleTick) return; }
+  try { fxClockTick(ts); } catch(e) {}
+  // Throttle to ~30fps only in eco mode while idle; full fps otherwise (smooth drag/animation).
+  if(fxPerfMode && !fxSceneBusy() && !isDragging) { fxIdleTick ^= 1; if(fxIdleTick) return; }
   time += 0.016;
   if(!fxReducedMotion) {
     // Gentle board float
@@ -5737,7 +5838,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   setChatHidden(false);
   updateResignButtonState();
   try { fxInit(); } catch(e) {}
-  setAIModelLabel(shouldUseMistral() ? 'local engine + mistral' : 'local engine');
+  setAIModelLabel('');
   const searchParams = new URLSearchParams(window.location.search);
   const wantsTutorial = searchParams.get('tutorial')==='1' || searchParams.get('mode')==='tutorial' || localStorage.getItem(TUTORIAL_STORAGE_KEY)==='1';
   const fenParam = searchParams.get('fen');
@@ -5897,6 +5998,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
   #fx-qr-note { color: #aaa; font-size: 0.76rem; margin: 10px 0; line-height: 1.4; }
   #fx-qr-link { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(212,175,55,0.25); color: #e8e2c8; border-radius: 8px; padding: 8px; font-size: 0.66rem; font-family: monospace; resize: none; word-break: break-all; }
   body.fx-perf #fx-qr { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+</style>
+
+<style id="fx-v5-style">
+  /* Dropdown styled to match the dark gold theme (options were unreadable white) */
+  #fx-theme { color-scheme: dark; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23D4AF37' d='M6 8 0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 26px; cursor: pointer; }
+  #fx-theme option { background: #14110a; color: #f5f0d2; }
+  #fx-theme:hover { border-color: rgba(212,175,55,0.5); }
+  /* Range slider polish */
+  #fx-skill { cursor: pointer; }
+  /* Smoother default transitions for clickable chrome */
+  .icon-btn, .topbar-link-btn, .chat-header-btn { transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease; }
 </style>
 
 </body>
