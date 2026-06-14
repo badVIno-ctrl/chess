@@ -1175,6 +1175,18 @@
   #fx-handoff-ready { background: var(--gold); color: #000; border: none; border-radius: 12px; padding: 14px 30px; font-size: 1rem; font-weight: 700; cursor: pointer; }
   #fx-handoff-ready:active { transform: translateY(1px); }
 </style>
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Шахматы">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script>
+  if('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(){}); });
+  }
+</script>
 </head>
 <body>
 
@@ -2380,7 +2392,7 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileViewport ? 1.25 : 1.8));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   document.getElementById('canvas-container').appendChild(renderer.domElement);
 
   raycaster = new THREE.Raycaster();
@@ -2825,8 +2837,8 @@ function getDefaultCameraState() {
     const preset = CAMERA_PRESETS[presetKey];
     return { theta, phi: preset.phi, radius: isMobile ? preset.radiusMobile : preset.radiusDesktop };
   }
-  if(isMobile && isPortrait) return { theta, phi: 1.16, radius: 13.6 };
-  if(isMobile) return { theta, phi: 1.04, radius: 12.2 };
+  if(isMobile && isPortrait) return { theta, phi: 1.12, radius: 15.8 };
+  if(isMobile) return { theta, phi: 1.02, radius: 13.4 };
   return { theta, phi: Math.PI / 3.5, radius: 11 };
 }
 
@@ -4826,12 +4838,12 @@ function updateMobileChatTrigger() {
   const isMobile = window.innerWidth <= 768;
   const isOpen = panel.classList.contains('mobile-open');
   if(isMobile) {
-    toggleBtn.textContent = isOpen ? 'Свернуть чат' : 'Чат с ИИ';
+    toggleBtn.textContent = isOpen ? 'Свернуть' : 'Меню и чат';
   } else {
     toggleBtn.textContent = 'ЧАТ';
   }
   if(restoreBtn && isMobile) restoreBtn.textContent = 'Чат с ИИ';
-  if(actionChatBtn) actionChatBtn.textContent = isOpen ? 'Свернуть чат' : 'Чат с ИИ';
+  if(actionChatBtn) actionChatBtn.textContent = isOpen ? 'Свернуть' : 'Меню и чат';
 }
 
 function setChatHidden(hidden) {
@@ -5670,7 +5682,7 @@ function fxApplyQuality() {
   try {
     try { document.body.classList.toggle('fx-perf', !!fxPerfMode); document.body.classList.toggle('fx-reduced', !!fxReducedMotion); } catch(e) {}
     if(typeof renderer === 'undefined' || !renderer) return;
-    const cap = fxPerfMode ? 1 : (fxIsMobile() ? 1.25 : 1.8);
+    const cap = fxPerfMode ? 1.5 : 2;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
     if(renderer.shadowMap) {
       const wantShadows = !fxPerfMode;
@@ -5749,7 +5761,7 @@ function onResize() {
   camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth <= 768 ? 1.25 : 1.8));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   applyResponsiveCameraPreset();
   updateMobileChatTrigger();
 }
@@ -6009,6 +6021,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
   #fx-skill { cursor: pointer; }
   /* Smoother default transitions for clickable chrome */
   .icon-btn, .topbar-link-btn, .chat-header-btn { transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease; }
+</style>
+
+<style id="fx-v7-mobile">
+  @media (max-width: 768px) {
+    #topbar { padding: 6px 10px 8px !important; gap: 6px !important; }
+    .diff-btn { padding: 7px 5px !important; font-size: 0.66rem !important; }
+    .difficulty-btns { gap: 4px !important; }
+    .topbar-link-btn { padding: 5px 9px !important; font-size: 0.7rem !important; }
+    #captured-area { display: none !important; }
+    #chat-panel.mobile-open { height: 84vh !important; max-height: 84vh !important; border-radius: 18px 18px 0 0 !important; }
+    #chat-panel.mobile-open #fx-dock { max-height: none !important; }
+    #fx-move-list { max-height: 160px !important; }
+    .action-btn { min-height: 46px !important; font-size: 0.72rem !important; }
+    #fx-think { font-size: 0.78rem !important; }
+  }
 </style>
 
 </body>
